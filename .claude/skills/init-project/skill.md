@@ -162,45 +162,7 @@ Create `docs/PROGRESS.md` with:
 
 **For Elixir/Phoenix projects:**
 
-Elixir projects should use ecosystem tooling rather than prescriptive rules:
-
-1. **Check for AGENTS.md**
-   ```bash
-   ls AGENTS.md
-   ```
-   Phoenix 1.8+ generates this. If it exists, read it and incorporate its guidance.
-
-2. **Check/Install Igniter**
-   ```bash
-   grep "igniter" mix.exs
-   ```
-   If not present, suggest adding to `mix.exs`:
-   ```elixir
-   {:igniter, "~> 0.6", only: [:dev, :test]}
-   ```
-
-3. **Install usage_rules via Igniter**
-   ```bash
-   mix deps.get
-   mix igniter.install usage_rules
-   ```
-
-4. **Sync dependency documentation**
-   ```bash
-   mix usage_rules.sync --all
-   ```
-   This creates consolidated docs from all deps that provide usage rules.
-
-5. **Create/Update CLAUDE.md**
-   If AGENTS.md exists, extract key conventions into CLAUDE.md:
-   - Project structure overview
-   - Key architectural patterns
-   - Important commands
-   - Any project-specific rules from AGENTS.md
-
-6. **Do NOT create prescriptive Elixir rules**
-   The synced usage_rules and AGENTS.md provide authoritative guidance.
-   Only add project-specific notes to CLAUDE.md.
+Follow `.claude/rules/elixir/setup.md` - uses ecosystem tooling (Igniter, usage_rules, AGENTS.md) rather than prescriptive rules.
 
 ### 7. Output
 

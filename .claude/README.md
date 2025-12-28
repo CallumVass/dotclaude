@@ -152,50 +152,15 @@ Verify UI in the browser using Playwright:
 
 ## Elixir Setup
 
-Elixir projects use ecosystem tooling rather than prescriptive rules:
+See `.claude/rules/elixir/setup.md` for detailed instructions.
 
-### 1. Install Igniter
-
-Add to your `mix.exs`:
-
-```elixir
-defp deps do
-  [
-    # ... your deps
-    {:igniter, "~> 0.6", only: [:dev, :test]}
-  ]
-end
-```
-
-### 2. Install usage_rules via Igniter
-
+Quick start:
 ```bash
+# Add {:igniter, "~> 0.6", only: [:dev, :test]} to mix.exs
 mix deps.get
 mix igniter.install usage_rules
-```
-
-### 3. Sync Documentation
-
-```bash
 mix usage_rules.sync --all
 ```
-
-This pulls authoritative documentation from all dependencies that provide usage rules.
-
-### 4. Check for AGENTS.md
-
-Phoenix 1.8+ generates an `AGENTS.md` file with project-specific guidance. If it exists, Claude will read and follow it.
-
-### 5. Create CLAUDE.md (Optional)
-
-For project-specific conventions not covered by AGENTS.md or usage_rules, create a `CLAUDE.md` in your project root.
-
-### Why This Approach?
-
-- **No stale rules**: `usage_rules` syncs from actual dependency versions
-- **Ecosystem alignment**: Uses tools the Elixir community maintains
-- **Authoritative**: Library authors write their own usage rules
-- **Composable**: Igniter provides smart code generation
 
 ## Customization
 

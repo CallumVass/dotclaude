@@ -84,6 +84,7 @@ Edit `.claude/settings.local.json`:
 /init-project    # Brainstorm, generate PRD & progress tracker
 /next-feature    # Pick next work items
 /feature-dev     # Plan implementation (built-in plugin)
+/commit          # Standardized conventional commits
 /review-merge    # Review code, update progress, merge
 ```
 
