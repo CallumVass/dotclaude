@@ -17,37 +17,53 @@ ls AGENTS.md
 
 If it exists, read it and follow its conventions.
 
-### 2. Install Igniter (if not present)
+### 2. Install the Claude Package (Recommended)
 
-[Igniter](https://github.com/ash-project/igniter) provides smart code generation and project modification:
-
-```elixir
-# In mix.exs deps
-{:igniter, "~> 0.6", only: [:dev, :test]}
-```
-
-Then use `mix igniter.install <package>` for smarter dependency setup.
-
-### 3. Install usage_rules via Igniter
-
-[usage_rules](https://hexdocs.pm/usage_rules) syncs documentation from dependencies:
+The [claude](https://hexdocs.pm/claude) package provides Claude Code-specific integration:
 
 ```bash
-mix deps.get
+mix igniter.install claude
+```
+
+This automatically:
+- Adds `usage_rules` dependency
+- Creates/updates `CLAUDE.md` with links to dependency rules
+- Syncs rules from all dependencies to `deps/` folder
+
+The installer runs:
+```bash
+mix usage_rules.sync CLAUDE.md --all --link-to-folder deps
+```
+
+This keeps the root `CLAUDE.md` lean by linking to rules in `deps/` rather than inlining everything, reducing context window usage.
+
+### Alternative: Manual usage_rules Setup
+
+If you prefer not to use the `claude` package, install [usage_rules](https://hexdocs.pm/usage_rules) directly:
+
+```bash
 mix igniter.install usage_rules
-```
-
-### 4. Sync Dependency Rules
-
-```bash
 mix usage_rules.sync --all
 ```
 
-This creates consolidated documentation from all dependencies that provide usage rules.
+### 3. Nested CLAUDE.md Files (Optional)
 
-### 5. Update CLAUDE.md (if needed)
+For larger projects, create context-specific `CLAUDE.md` files in subdirectories:
 
-If the project has a `CLAUDE.md`, add any project-specific patterns discovered. If not, consider creating one with:
+```
+lib/
+├── my_app_web/
+│   └── CLAUDE.md    # Web-specific guidance
+└── my_app/
+    └── accounts/
+        └── CLAUDE.md  # Accounts context guidance
+```
+
+Rules in nested files are inlined for focused context when working in those directories.
+
+### 4. Update CLAUDE.md (if needed)
+
+Add project-specific patterns:
 
 - Key architectural decisions
 - Project-specific conventions
@@ -58,7 +74,10 @@ If the project has a `CLAUDE.md`, add any project-specific patterns discovered. 
 ### Before Starting Work
 
 ```bash
-# Ensure rules are current
+# Ensure rules are current (if using claude package)
+mix usage_rules.sync CLAUDE.md --all --link-to-folder deps
+
+# Or if using usage_rules directly
 mix usage_rules.sync --all
 ```
 
@@ -79,9 +98,27 @@ Use `mix usage_rules.search_docs` to search hexdocs:
 mix usage_rules.search_docs phoenix "live view"
 ```
 
+## Sub-Agent Usage Rules
+
+When spawning sub-agents, you can reference specific usage rules via the `usage_rules` field:
+
+```elixir
+# Load main rules file from a package
+usage_rules: [:phoenix]
+
+# Load all rules from a package
+usage_rules: ["phoenix:all"]
+
+# Load specific rule from a package
+usage_rules: ["phoenix:live_view"]
+```
+
+This allows sub-agents to have focused context for their specific tasks.
+
 ## Why This Approach?
 
 1. **No stale rules**: `usage_rules` syncs from actual dependency versions
 2. **Ecosystem alignment**: Uses tools the Elixir community maintains
 3. **Project-specific**: AGENTS.md and CLAUDE.md capture what's unique
 4. **Composable**: Igniter lets generators call other generators intelligently
+5. **Context-efficient**: Linking to deps folder keeps CLAUDE.md lean
