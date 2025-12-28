@@ -14,7 +14,9 @@
       "Skill(browser-check)",
       "Skill(feature-dev:feature-dev)",
       "Skill(code-review:code-review)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(gh repo sync:*)",
+      "WebFetch(domain:hexdocs.pm)"
     ]
   }
 }

@@ -1,6 +1,6 @@
 # dotclaude
 
-Reusable [Claude Code](https://claude.ai/claude-code) configuration for multi-stack projects.
+Reusable [Claude Code](https://claude.ai/code) configuration for multi-stack projects.
 
 ## What's This?
 
