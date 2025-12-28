@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git:*)",
+      "Bash(ls:*)",
+      "Bash(mkdir:*)",
+      "Bash(tree:*)",
+      "Bash(dir:*)",
+      "Bash(grep:*)",
+      "Skill(next-feature)",
+      "Skill(init-project)",
+      "Skill(review-merge)",
+      "Skill(browser-check)",
+      "Skill(feature-dev:feature-dev)",
+      "Skill(code-review:code-review)",
+      "WebSearch"
+    ]
+  }
+}
