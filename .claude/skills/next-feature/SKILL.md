@@ -52,7 +52,68 @@ Suggest using `/feature-dev` plugin for planning the implementation - this provi
 ### 5. On Confirmation
 
 - Create feature branch: `git checkout -b feat/<feature-name>`
-- Use the `feature-dev:feature-dev` skill to plan implementation
+- Use the `feature-dev:feature-dev` skill to plan and implement
+
+### 6. Iterative Review Loop
+
+After implementation, enter a review-fix cycle:
+
+```
+┌─────────────┐
+│  Implement  │◄──────────────────┐
+│ feature-dev │                   │
+└──────┬──────┘                   │
+       │                          │
+       ▼                          │
+┌─────────────┐                   │
+│   Review    │                   │
+│code-reviewer│                   │
+└──────┬──────┘                   │
+       │                          │
+       ▼                          │
+┌─────────────┐    Issues remain  │
+│  Evaluate   │───────────────────┘
+│   & Fix     │
+└──────┬──────┘
+       │ All resolved/dismissed
+       ▼
+┌─────────────┐
+│   Complete  │
+└─────────────┘
+```
+
+**Process:**
+
+1. Run `feature-dev:code-reviewer` on the implementation
+2. For EACH issue (critical, moderate, or minor):
+   - **Fix it** (default action), OR
+   - **Dismiss with justification** - only if:
+     - False positive (reviewer misunderstood)
+     - Intentional design decision (explain why)
+     - Out of scope (requires changes beyond this feature)
+     - Contradicts project conventions (cite the rule)
+3. After fixes, re-run `feature-dev:code-reviewer`
+4. Repeat until all issues are resolved or explicitly dismissed
+
+**Dismissal format:**
+```
+DISMISSED: [Issue description]
+REASON: [Specific justification]
+```
+
+**Exit criteria:**
+- Code-reviewer reports no issues, OR
+- All remaining issues have valid dismissal justifications
+
+**Autonomy:** Do not ask the user which issues to fix. Fix all issues by default.
+Only pause for user input if the fix would require changes outside the feature scope.
+
+### 7. Completion
+
+Once the review loop exits:
+- Run tests to verify nothing is broken
+- Update `docs/PROGRESS.md` - mark completed items with `[x]`
+- Ready for commit
 
 ## Grouping Logic
 
