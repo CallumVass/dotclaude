@@ -106,8 +106,8 @@ return Ok(result.Value);
 
 - Always use `async`/`await` for I/O operations
 - Suffix async methods with `Async`
-- Use `ConfigureAwait(false)` in library code
 - Don't mix sync and async (avoid `.Result`, `.Wait()`)
+- **ConfigureAwait(false)**: Not needed in ASP.NET Core apps (no SynchronizationContext exists). Only use in library code that may be consumed by UI apps or legacy ASP.NET
 
 ```csharp
 // Good

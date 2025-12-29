@@ -22,6 +22,14 @@ Universal patterns applicable across all tech stacks.
 - Flat is better than nested
 - If a function needs extensive comments, it's too complex
 
+### Balancing These Principles
+
+These principles exist in tension - dogmatic application of one can violate another:
+
+- Aggressive DRY can create complex abstractions that violate KISS
+- "Duplication is far cheaper than the wrong abstraction" - Sandi Metz
+- When in doubt, prefer simple duplicated code over a premature abstraction
+
 ---
 
 ## Layer Architecture
