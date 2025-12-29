@@ -1,6 +1,6 @@
 ---
 name: next-feature
-description: Start planning the next feature. Reads PROGRESS.md to find related unchecked items that can be worked on together.
+description: Start work on the next feature. Use when user says "next feature", "start the next feature", "what should we work on next", or similar. Reads PROGRESS.md to find related unchecked items.
 user_invocable: true
 arguments:
   - name: steer
