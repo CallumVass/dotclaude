@@ -6,7 +6,7 @@ Reusable [Claude Code](https://claude.ai/code) configuration for multi-stack pro
 
 Like dotfiles for your shell, this is a portable `.claude/` configuration with:
 
-- **Skills**: `/init-project`, `/next-feature`, `/review-merge`, `/browser-check`
+- **Skills**: `/init-project`, `/next-feature`, `/browser-check`
 - **Rules**: Stack-specific patterns for TypeScript, .NET, and Elixir
 - **Templates**: PRD and progress tracking documents
 
@@ -43,8 +43,8 @@ You can set these via `claude config` or in your settings file.
 
 | Plugin | Used By |
 |--------|---------|
-| `feature-dev` | `/next-feature` recommends this for implementation planning |
-| `code-review` | `/review-merge` uses this for code review |
+| `feature-dev` | `/next-feature` uses explorer/architect/reviewer subagents |
+| `code-review` | `/next-feature` review loop, standalone PR reviews |
 | `playwright` | `/browser-check` uses this for UI verification |
 | `frontend-design` | Quality UI component generation |
 | `context7` | Up-to-date library documentation |
@@ -82,17 +82,18 @@ Edit `.claude/settings.local.json`:
 
 ```
 /init-project    # Brainstorm, generate PRD & progress tracker
-/next-feature    # Pick next work items
-/feature-dev     # Plan implementation (built-in plugin)
-/commit          # Standardized conventional commits
-/review-merge    # Review code, update progress, merge
+/next-feature    # Full feature workflow with auto-review loop
+/browser-check   # UI verification with Playwright
+/commit          # Standardized conventional commits (built-in)
 ```
 
 ## Workflow
 
 ```
-/init-project → /next-feature → /feature-dev → /review-merge → repeat
+/init-project → /next-feature → /commit → repeat
 ```
+
+`/next-feature` handles the full cycle: exploration, architecture, implementation, and review loop.
 
 ## Elixir Projects
 
@@ -123,8 +124,7 @@ Phoenix 1.8+ generates `AGENTS.md` which Claude will read automatically.
 │   └── elixir/             # Setup guide (defers to tooling)
 ├── skills/
 │   ├── init-project/       # Project scaffolding
-│   ├── next-feature/       # Feature selection
-│   ├── review-merge/       # Code review + progress
+│   ├── next-feature/       # Full feature workflow
 │   └── browser-check/      # UI verification
 └── templates/
     ├── PRD.md              # Product requirements
