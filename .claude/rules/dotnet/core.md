@@ -1,11 +1,5 @@
 # .NET Core Rules
 
-## Activation
-
-These rules apply when working with .NET projects. Enable by adding to project's `.claude/settings.local.json`.
-
----
-
 ## Project Structure
 
 ```

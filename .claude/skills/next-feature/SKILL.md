@@ -149,7 +149,7 @@ Present all approaches with trade-offs and your recommendation. Ask user to pick
 
 **Actor**: Subagent | **Context**: ~5% (runs in subagent)
 
-Hand off to review subagent. **Do not do this yourself.**
+Run the review-fix loop on all changed files. This uses the same pattern as `/review-loop`.
 
 ```
 Task(
@@ -159,41 +159,14 @@ Task(
     Feature: [description]
     Files changed: [list from implementation]
 
-    ## Your Task
+    Loop:
+    1. Spawn feature-dev:code-reviewer to review files
+    2. Evaluate each issue (real problem? in scope? should fix?)
+    3. Fix valid issues with Edit tool, dismiss others with justification
+    4. Spawn code-reviewer AGAIN - fixes may introduce new issues
+    5. Repeat until reviewer returns 'NO ISSUES FOUND'
 
-    Run this loop until no issues remain:
-
-    1. REVIEW: Check all changed files for:
-       - Bugs and logic errors
-       - Security issues
-       - Missing error handling
-       - Project convention violations
-       - Code that doesn't match surrounding patterns
-
-    2. EVALUATE each issue:
-       - Is it a real problem? (not false positive)
-       - Is it in scope? (not unrelated code)
-       - Should it be fixed? (not intentional design)
-
-    3. FIX valid issues directly. For each fix, note what you changed.
-
-    4. After fixing, REVIEW AGAIN. New issues may have been introduced.
-
-    5. REPEAT until a review pass finds no issues.
-
-    ## Exit Criteria
-
-    Return ONLY when:
-    - A full review pass finds zero issues, OR
-    - All remaining issues are intentional/out-of-scope (explain why)
-
-    ## Return Format
-
-    When complete, return:
-    - Number of review iterations
-    - Summary of fixes made
-    - Any dismissed issues with justification
-    - Confirmation: 'Code is clean and ready to commit'"
+    Return: iteration count, fixes made, dismissed issues, confirmation."
 )
 ```
 

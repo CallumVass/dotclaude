@@ -6,7 +6,7 @@ Reusable [Claude Code](https://claude.ai/code) configuration for multi-stack pro
 
 Like dotfiles for your shell, this is a portable `.claude/` configuration with:
 
-- **Skills**: `/init-project`, `/next-feature`, `/browser-check`
+- **Skills**: `/init-project`, `/next-feature`, `/review-loop`, `/browser-check`
 - **Rules**: Stack-specific patterns for TypeScript, .NET, and Elixir
 - **Templates**: PRD and progress tracking documents
 
@@ -43,8 +43,8 @@ You can set these via `claude config` or in your settings file.
 
 | Plugin | Used By |
 |--------|---------|
-| `feature-dev` | `/next-feature` uses explorer/architect/reviewer subagents |
-| `code-review` | `/next-feature` review loop, standalone PR reviews |
+| `feature-dev` | `/next-feature` and `/review-loop` use explorer/architect/reviewer subagents |
+| `code-review` | Standalone PR reviews via `/code-review` |
 | `playwright` | `/browser-check` uses this for UI verification |
 | `frontend-design` | Quality UI component generation |
 | `context7` | Up-to-date library documentation |
@@ -62,20 +62,25 @@ cp -r dotclaude/.claude your-project/
 npx degit CallumVass/dotclaude/.claude your-project/.claude
 ```
 
-### 2. Configure for Your Stack
+### 2. Keep Rules for Your Stack
 
-Edit `.claude/settings.local.json`:
+Delete rules you don't need. All `.md` files in `.claude/rules/` auto-load:
 
-```json
-{
-  "rules": {
-    "include": [
-      ".claude/rules/patterns.md",
-      ".claude/rules/typescript/core.md",
-      ".claude/rules/typescript/vue.md"
-    ]
-  }
-}
+```
+.claude/rules/
+├── patterns.md              # Keep - universal patterns
+├── typescript/              # Keep if using TypeScript
+├── dotnet/                  # Delete if not using .NET
+└── elixir/                  # Delete if not using Elixir
+```
+
+For path-specific rules, add YAML frontmatter:
+
+```markdown
+---
+paths: src/**/*.ts
+---
+# These rules only apply to TypeScript files
 ```
 
 ### 3. Start Building
@@ -83,6 +88,7 @@ Edit `.claude/settings.local.json`:
 ```
 /init-project    # Brainstorm, generate PRD & progress tracker
 /next-feature    # Full feature workflow with auto-review loop
+/review-loop     # Standalone review-fix cycle (used by next-feature)
 /browser-check   # UI verification with Playwright
 /commit          # Standardized conventional commits (built-in)
 ```
@@ -129,6 +135,7 @@ Phoenix 1.8+ generates `AGENTS.md` which Claude reads automatically.
 ├── skills/
 │   ├── init-project/       # Project scaffolding
 │   ├── next-feature/       # Full feature workflow
+│   ├── review-loop/        # Iterative review-fix cycle
 │   └── browser-check/      # UI verification
 └── templates/
     ├── PRD.md              # Product requirements

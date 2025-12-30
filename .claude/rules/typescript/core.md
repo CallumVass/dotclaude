@@ -1,19 +1,5 @@
 # TypeScript Core Rules
 
-## Activation
-
-These rules apply when working with TypeScript projects. Enable by adding to project's `.claude/settings.local.json`:
-
-```json
-{
-  "rules": {
-    "include": [".claude/rules/typescript/core.md"]
-  }
-}
-```
-
----
-
 ## Core Principles
 
 - No `any` types - use `unknown` and type guards if needed
