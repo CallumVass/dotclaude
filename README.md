@@ -99,18 +99,22 @@ Edit `.claude/settings.local.json`:
 
 Elixir uses ecosystem tooling instead of prescriptive rules:
 
-```elixir
-# Add igniter to mix.exs
-{:igniter, "~> 0.6", only: [:dev, :test]}
+```bash
+mix igniter.install claude
 ```
+
+This automatically:
+- Adds `usage_rules` dependency
+- Creates/updates `CLAUDE.md` with links to dependency rules
+- Syncs rules from all deps to `deps/` folder (keeps context lean)
+
+To manually re-sync after adding dependencies:
 
 ```bash
-mix deps.get
-mix igniter.install usage_rules
-mix usage_rules.sync --all
+mix usage_rules.sync CLAUDE.md --all --link-to-folder deps
 ```
 
-Phoenix 1.8+ generates `AGENTS.md` which Claude will read automatically.
+Phoenix 1.8+ generates `AGENTS.md` which Claude reads automatically.
 
 ## Structure
 
