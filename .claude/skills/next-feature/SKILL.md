@@ -149,10 +149,16 @@ Present all approaches with trade-offs and your recommendation. Ask user to pick
 
 **Actor**: Main agent | **Context**: ~10%
 
-Run the review-fix loop on all changed files. Same pattern as `/review-loop`.
+```
+╔═══════════════════════════════════════════════════════════════╗
+║  MANDATORY: DO NOT SKIP THIS PHASE                            ║
+║  You MUST run the review loop before proceeding to Phase 7    ║
+║  Code is NOT ready to commit until reviewer returns clean     ║
+╚═══════════════════════════════════════════════════════════════╝
+```
 
-**NOTE**: Plugin subagent types (like `feature-dev:code-reviewer`) cannot be spawned from
-nested subagents. The main agent must run this loop directly.
+**NOTE**: Plugin subagent types cannot be spawned from nested subagents.
+The main agent must run this loop directly.
 
 ### Loop until clean:
 
@@ -221,5 +227,6 @@ Ready to commit.
 - No PROGRESS.md? → Suggest `/init-project` first
 - Subagents return summaries → Read key files they identify
 - User picks architecture → Don't proceed without selection
+- **Review loop is MANDATORY** → Must run before Phase 7, no exceptions
 - Review loop runs in main → Plugin subagents can't be nested
 - Complete phases in order → Don't skip ahead
