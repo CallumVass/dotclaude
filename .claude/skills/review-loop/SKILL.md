@@ -41,75 +41,51 @@ Starting review loop...
 
 ---
 
-## Step 2: Run Review Loop (Subagent)
+## Step 2: Run Review Loop
 
-**Hand off to subagent. Do not do this yourself.**
+Run this loop yourself until no issues remain:
+
+### 2a. REVIEW (spawn specialized reviewer)
+
+Use the Task tool with these parameters:
+- `subagent_type`: `feature-dev:code-reviewer`
+- `prompt`: Include the file list and review criteria
 
 ```
 Task(
-  subagent_type: "general-purpose",
-  prompt: "Review and fix code until clean.
+  subagent_type: "feature-dev:code-reviewer",
+  prompt: "Review these files: [list of files]
 
-    Files to review:
-    [list of files]
+    Check for:
+    - Bugs and logic errors
+    - Security vulnerabilities
+    - Missing error handling
+    - Project convention violations
+    - Code quality issues
 
-    ## Your Task
-
-    Run this loop until no issues remain:
-
-    ### 1. REVIEW (use specialized reviewer)
-
-    Spawn a code-reviewer subagent:
-
-    Task(
-      subagent_type: 'feature-dev:code-reviewer',
-      prompt: 'Review these files:
-        [list of files]
-
-        Check for:
-        - Bugs and logic errors
-        - Security vulnerabilities
-        - Missing error handling
-        - Project convention violations
-        - Code quality issues
-
-        Return numbered list of issues with file:line references,
-        or NO ISSUES FOUND if clean.'
-    )
-
-    ### 2. EVALUATE each issue returned
-
-    For each issue, decide:
-    - Is it a real problem? (not false positive)
-    - Is it in scope? (not unrelated code)
-    - Should it be fixed? (not intentional design)
-
-    ### 3. FIX valid issues
-
-    Use Edit tool to fix each valid issue. Note what you changed.
-    Dismiss invalid issues with justification.
-
-    ### 4. LOOP
-
-    After fixing, spawn code-reviewer AGAIN.
-    Fixes may have introduced new issues.
-    REPEAT until reviewer returns 'NO ISSUES FOUND'.
-
-    ## Exit Criteria
-
-    Return ONLY when:
-    - Code-reviewer returns 'NO ISSUES FOUND', OR
-    - All remaining issues are dismissed with valid justification
-
-    ## Return Format
-
-    When complete, return:
-    - Number of review iterations
-    - Summary of fixes made
-    - Any dismissed issues with justification
-    - Confirmation: 'Code is clean and ready to commit'"
+    Return numbered list of issues with file:line references,
+    or 'NO ISSUES FOUND' if clean."
 )
 ```
+
+### 2b. EVALUATE each issue
+
+For each issue returned, decide:
+- Is it a real problem? (not false positive)
+- Is it in scope? (not unrelated code)
+- Should it be fixed? (not intentional design)
+
+### 2c. FIX valid issues
+
+Use Edit tool to fix each valid issue. Track what you changed.
+Dismiss invalid issues with justification.
+
+### 2d. LOOP
+
+After fixing, spawn `feature-dev:code-reviewer` AGAIN.
+Fixes may introduce new issues.
+
+**REPEAT steps 2a-2d** until reviewer returns "NO ISSUES FOUND".
 
 ---
 
@@ -136,5 +112,6 @@ Ready to commit.
 ## Quick Reference
 
 - No changes detected? → Nothing to review
-- Subagent runs autonomously → Wait for completion
+- Main agent runs the loop → Spawns code-reviewer each iteration
 - All issues get addressed → Fixed or dismissed with reason
+- Plugin subagents can't be nested → Must spawn from main agent

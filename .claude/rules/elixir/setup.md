@@ -115,6 +115,114 @@ usage_rules: ["phoenix:live_view"]
 
 This allows sub-agents to have focused context for their specific tasks.
 
+## Testing
+
+Test at boundaries - LiveViews, Controllers, and CLI commands. Use real contexts and services with database isolation via Ecto Sandbox.
+
+### Dependencies
+
+```elixir
+# mix.exs
+defp deps do
+  [
+    {:ex_machina, "~> 2.8", only: :test},
+    {:mox, "~> 1.0", only: :test}
+  ]
+end
+```
+
+### LiveView Tests
+
+```elixir
+defmodule MyAppWeb.UsersLiveTest do
+  use MyAppWeb.ConnCase, async: true
+  import Phoenix.LiveViewTest
+  import MyApp.AccountsFixtures
+
+  describe "Index" do
+    test "lists all users", %{conn: conn} do
+      user = user_fixture()
+
+      {:ok, _view, html} = live(conn, ~p"/users")
+
+      assert html =~ user.email
+    end
+
+    test "creates user with valid data", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/users/new")
+
+      view
+      |> form("#user-form", user: %{email: "test@example.com", name: "Test"})
+      |> render_submit()
+
+      assert_redirect(view, ~p"/users")
+    end
+  end
+end
+```
+
+### Factories with ExMachina
+
+```elixir
+defmodule MyApp.Factory do
+  use ExMachina.Ecto, repo: MyApp.Repo
+
+  def user_factory do
+    %MyApp.Accounts.User{
+      email: sequence(:email, &"user#{&1}@example.com"),
+      name: Faker.Person.name(),
+      inserted_at: DateTime.utc_now()
+    }
+  end
+
+  def admin_factory do
+    struct!(user_factory(), role: :admin)
+  end
+end
+
+# Usage in tests
+import MyApp.Factory
+
+user = insert(:user)
+admin = insert(:admin)
+users = insert_list(3, :user)
+```
+
+### Mock External Services with Mox
+
+```elixir
+# test/support/mocks.ex
+Mox.defmock(MyApp.PaymentsMock, for: MyApp.Payments.Behaviour)
+
+# config/test.exs
+config :my_app, :payments_client, MyApp.PaymentsMock
+
+# In test
+import Mox
+
+expect(MyApp.PaymentsMock, :charge, fn _amount, _token ->
+  {:ok, %{id: "ch_123", status: "succeeded"}}
+end)
+```
+
+### Test Organization
+
+```
+test/
+├── my_app/              # Context tests (if needed for complex logic)
+├── my_app_web/
+│   ├── live/
+│   │   ├── users_live_test.exs
+│   │   └── orders_live_test.exs
+│   └── controllers/
+│       └── api/
+│           └── users_controller_test.exs
+└── support/
+    ├── factory.ex
+    ├── fixtures/
+    └── mocks.ex
+```
+
 ## Why This Approach?
 
 1. **No stale rules**: `usage_rules` syncs from actual dependency versions

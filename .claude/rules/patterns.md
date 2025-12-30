@@ -172,25 +172,87 @@ def valid_role?(role), do: role in @roles
 
 ## Testing Patterns
 
-### Pure Functions (Unit Tests)
+### Core Philosophy: Boundary Testing
 
-Test deterministic behavior with known inputs:
-
-```
-Given: specific input
-When: function is called
-Then: expect exact output
-```
-
-### Side Effects (Integration Tests)
-
-Test interactions with external systems:
+Test at the boundaries where users interact with your system - APIs, Views, LiveViews. Use real implementations internally, only mocking external services.
 
 ```
-Given: known system state
-When: operation is performed
-Then: verify state changes and side effects
+┌─────────────────────────────────────────────────────────┐
+│                    TEST BOUNDARY                        │
+│  ┌───────────────────────────────────────────────────┐  │
+│  │  HTTP Request / View Render                       │  │
+│  │         ↓                                         │  │
+│  │  Controller / LiveView                            │  │
+│  │         ↓                                         │  │
+│  │  Service Layer            ← All real              │  │
+│  │         ↓                   implementations       │  │
+│  │  Repository / Context                             │  │
+│  │         ↓                                         │  │
+│  └───────────────────────────────────────────────────┘  │
+│                       ↓                                 │
+│  ┌───────────────────────────────────────────────────┐  │
+│  │  Database / External APIs   ← Mock/fake here only │  │
+│  └───────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────┘
 ```
+
+**Why this approach:**
+- Tests don't break when you refactor internals
+- Tests verify actual user-facing behavior
+- Less mocking = less test maintenance
+- Higher confidence the system actually works
+
+### What to Test
+
+| Boundary | What to Test | Mock Only |
+|----------|--------------|-----------|
+| API endpoints | HTTP request → response | Database, external APIs |
+| Views/Pages | User interactions, renders | Database, external APIs |
+| LiveViews | Real-time updates, events | Database, external APIs |
+| CLI commands | Input → output | File system, network |
+
+### What NOT to Test Separately
+
+Don't create isolated unit tests for internal collaborators:
+
+```
+# Don't test these in isolation:
+UserService        ← tested via API endpoint
+UserRepository     ← tested via API endpoint
+UserValidator      ← tested via API endpoint
+
+# Do test at the boundary:
+GET /users         ← tests the full vertical slice
+```
+
+### Test Data: Use Generators
+
+Don't hand-craft test data. Use generators/factories:
+
+| Stack | Library | Purpose |
+|-------|---------|---------|
+| .NET | AutoFixture, Bogus | Generate realistic test data |
+| TypeScript | @faker-js/faker | Generate realistic test data |
+| Elixir | ExMachina | Factory-based test data |
+
+### Test Structure (Arrange-Act-Assert)
+
+```
+Arrange: Set up test data (via factories), configure test server
+Act:     Make HTTP request / render view / trigger event
+Assert:  Verify response status, body, side effects
+```
+
+### When to Mock
+
+**Only mock external I/O:**
+- Database connections (or use in-memory/container)
+- Third-party APIs (payment, email, SMS)
+- File system, network, time
+
+**Never mock your own code:**
+- Services, repositories, validators
+- If you're mocking it, you're testing implementation not behavior
 
 ---
 

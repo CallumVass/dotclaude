@@ -148,3 +148,144 @@ async function fetchUser(id: UserId): Promise<Result<User, 'not_found' | 'networ
   }
 }
 ```
+
+---
+
+## Testing
+
+Test at API boundaries using Supertest. Use real services - only mock external APIs with MSW.
+
+### Dependencies
+
+```json
+{
+  "devDependencies": {
+    "vitest": "^2.0.0",
+    "supertest": "^7.0.0",
+    "@faker-js/faker": "^9.0.0",
+    "msw": "^2.0.0"
+  }
+}
+```
+
+### API Integration Tests
+
+```typescript
+import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import request from 'supertest'
+import { faker } from '@faker-js/faker'
+import { app } from '~/app'
+import { db } from '~/db'
+
+describe('Users API', () => {
+  beforeAll(async () => {
+    await db.migrate.latest()
+  })
+
+  afterAll(async () => {
+    await db.destroy()
+  })
+
+  it('GET /users returns all users', async () => {
+    // Arrange
+    await seedUsers(3)
+
+    // Act
+    const response = await request(app).get('/api/users')
+
+    // Assert
+    expect(response.status).toBe(200)
+    expect(response.body).toHaveLength(3)
+  })
+
+  it('POST /users creates user with valid data', async () => {
+    // Arrange
+    const userData = {
+      email: faker.internet.email(),
+      name: faker.person.fullName(),
+    }
+
+    // Act
+    const response = await request(app)
+      .post('/api/users')
+      .send(userData)
+
+    // Assert
+    expect(response.status).toBe(201)
+    expect(response.body.email).toBe(userData.email)
+  })
+
+  it('POST /users rejects invalid email', async () => {
+    // Arrange
+    const userData = { email: 'not-an-email', name: 'Test' }
+
+    // Act
+    const response = await request(app)
+      .post('/api/users')
+      .send(userData)
+
+    // Assert
+    expect(response.status).toBe(400)
+  })
+})
+```
+
+### Test Data with Faker
+
+```typescript
+import { faker } from '@faker-js/faker'
+
+function createUser(overrides?: Partial<User>): User {
+  return {
+    id: faker.string.uuid(),
+    email: faker.internet.email(),
+    name: faker.person.fullName(),
+    createdAt: faker.date.past(),
+    ...overrides,
+  }
+}
+
+// Usage
+const users = Array.from({ length: 10 }, () => createUser())
+const admin = createUser({ role: 'admin' })
+```
+
+### Mock External APIs with MSW
+
+```typescript
+import { setupServer } from 'msw/node'
+import { http, HttpResponse } from 'msw'
+
+const server = setupServer(
+  // Mock Stripe API
+  http.post('https://api.stripe.com/v1/charges', () => {
+    return HttpResponse.json({ id: 'ch_123', status: 'succeeded' })
+  }),
+
+  // Mock email service
+  http.post('https://api.sendgrid.com/v3/mail/send', () => {
+    return new HttpResponse(null, { status: 202 })
+  })
+)
+
+beforeAll(() => server.listen())
+afterEach(() => server.resetHandlers())
+afterAll(() => server.close())
+```
+
+### Test Organization
+
+```
+src/
+├── api/
+│   └── users/
+│       └── route.ts
+└── __tests__/
+    ├── api/
+    │   ├── users.test.ts
+    │   └── orders.test.ts
+    ├── factories/
+    │   └── user.ts
+    └── mocks/
+        └── handlers.ts
+```

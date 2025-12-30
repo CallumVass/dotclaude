@@ -147,30 +147,32 @@ Present all approaches with trade-offs and your recommendation. Ask user to pick
 
 ## Phase 6: Review Loop
 
-**Actor**: Subagent | **Context**: ~5% (runs in subagent)
+**Actor**: Main agent | **Context**: ~10%
 
-Run the review-fix loop on all changed files. This uses the same pattern as `/review-loop`.
+Run the review-fix loop on all changed files. Same pattern as `/review-loop`.
 
-```
-Task(
-  subagent_type: "general-purpose",
-  prompt: "Review and fix code until clean.
+**NOTE**: Plugin subagent types (like `feature-dev:code-reviewer`) cannot be spawned from
+nested subagents. The main agent must run this loop directly.
 
-    Feature: [description]
-    Files changed: [list from implementation]
+### Loop until clean:
 
-    Loop:
-    1. Spawn feature-dev:code-reviewer to review files
-    2. Evaluate each issue (real problem? in scope? should fix?)
-    3. Fix valid issues with Edit tool, dismiss others with justification
-    4. Spawn code-reviewer AGAIN - fixes may introduce new issues
-    5. Repeat until reviewer returns 'NO ISSUES FOUND'
+1. **REVIEW**: Spawn the code reviewer
+   ```
+   Task(
+     subagent_type: "feature-dev:code-reviewer",
+     prompt: "Review these files: [list from implementation]
+       Check for: bugs, security issues, missing error handling, convention violations.
+       Return numbered list with file:line references, or 'NO ISSUES FOUND' if clean."
+   )
+   ```
 
-    Return: iteration count, fixes made, dismissed issues, confirmation."
-)
-```
+2. **EVALUATE**: For each issue - real problem? in scope? should fix?
 
-Wait for subagent to complete. Do not proceed until it returns.
+3. **FIX**: Use Edit tool for valid issues, dismiss others with justification
+
+4. **REPEAT**: Spawn code-reviewer again (fixes may introduce issues)
+
+Exit when reviewer returns "NO ISSUES FOUND".
 
 ---
 
@@ -208,9 +210,9 @@ Ready to commit.
 | 3. Clarification | ~5% | Main |
 | 4. Architecture | ~5% | Subagents (parallel) |
 | 5. Implementation | ~40% | Main |
-| 6. Review Loop | ~5% | Subagent |
+| 6. Review Loop | ~10% | Main (spawns reviewer) |
 | 7. Completion | ~5% | Main |
-| **Total** | **~70%** | |
+| **Total** | **~75%** | |
 
 ---
 
@@ -219,5 +221,5 @@ Ready to commit.
 - No PROGRESS.md? → Suggest `/init-project` first
 - Subagents return summaries → Read key files they identify
 - User picks architecture → Don't proceed without selection
-- Review loop is autonomous → Wait for "ready to commit"
+- Review loop runs in main → Plugin subagents can't be nested
 - Complete phases in order → Don't skip ahead

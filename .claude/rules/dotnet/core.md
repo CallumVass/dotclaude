@@ -211,26 +211,132 @@ public class UsersController : ControllerBase
 
 ## Testing
 
-Use xUnit with FluentAssertions:
+Test at API boundaries using `WebApplicationFactory`. Use real services and repositories - only mock the database or external APIs.
+
+### Test Project Setup
+
+```xml
+<!-- [ProjectName].Tests.csproj -->
+<PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="9.0.0" />
+<PackageReference Include="AutoFixture" Version="4.18.0" />
+<PackageReference Include="Bogus" Version="35.0.0" />
+<PackageReference Include="Testcontainers.PostgreSql" Version="4.0.0" />
+```
+
+### API Integration Tests
 
 ```csharp
-public class UserServiceTests
+public class UsersApiTests : IClassFixture<WebApplicationFactory<Program>>
 {
+    private readonly WebApplicationFactory<Program> _factory;
+    private readonly Fixture _fixture = new();
+
+    public UsersApiTests(WebApplicationFactory<Program> factory)
+    {
+        _factory = factory.WithWebHostBuilder(builder =>
+        {
+            builder.ConfigureServices(services =>
+            {
+                // Replace database with test container or in-memory
+                services.RemoveAll<DbContextOptions<AppDbContext>>();
+                services.AddDbContext<AppDbContext>(options =>
+                    options.UseInMemoryDatabase("TestDb"));
+            });
+        });
+    }
+
     [Fact]
-    public async Task GetUserAsync_WhenUserExists_ReturnsUser()
+    public async Task GetUsers_ReturnsAllUsers()
     {
         // Arrange
-        var mockRepo = new Mock<IUserRepository>();
-        mockRepo.Setup(r => r.GetByIdAsync(1))
-            .ReturnsAsync(new User { Id = 1, Name = "Test" });
-        var service = new UserService(mockRepo.Object);
+        var client = _factory.CreateClient();
+        await SeedUsers(3);
 
         // Act
-        var result = await service.GetUserAsync(1);
+        var response = await client.GetAsync("/api/users");
 
         // Assert
-        result.IsSuccess.Should().BeTrue();
-        result.Value!.Name.Should().Be("Test");
+        response.EnsureSuccessStatusCode();
+        var users = await response.Content.ReadFromJsonAsync<List<UserResponse>>();
+        Assert.Equal(3, users!.Count);
+    }
+
+    [Fact]
+    public async Task CreateUser_WithValidData_ReturnsCreated()
+    {
+        // Arrange
+        var client = _factory.CreateClient();
+        var request = _fixture.Create<CreateUserRequest>();
+
+        // Act
+        var response = await client.PostAsJsonAsync("/api/users", request);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreateUser_WithInvalidEmail_ReturnsBadRequest()
+    {
+        // Arrange
+        var client = _factory.CreateClient();
+        var request = new CreateUserRequest("not-an-email", "Test User");
+
+        // Act
+        var response = await client.PostAsJsonAsync("/api/users", request);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 }
+```
+
+### Test Data with Bogus
+
+```csharp
+public class UserFaker : Faker<User>
+{
+    public UserFaker()
+    {
+        RuleFor(u => u.Id, f => f.IndexFaker + 1);
+        RuleFor(u => u.Email, f => f.Internet.Email());
+        RuleFor(u => u.Name, f => f.Name.FullName());
+        RuleFor(u => u.CreatedAt, f => f.Date.Past());
+    }
+}
+
+// Usage
+var users = new UserFaker().Generate(10);
+```
+
+### Using Testcontainers (Real Database)
+
+```csharp
+public class DatabaseFixture : IAsyncLifetime
+{
+    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder()
+        .WithImage("postgres:16-alpine")
+        .Build();
+
+    public string ConnectionString => _postgres.GetConnectionString();
+
+    public async Task InitializeAsync() => await _postgres.StartAsync();
+    public async Task DisposeAsync() => await _postgres.DisposeAsync();
+}
+```
+
+### Test Organization
+
+```
+src/
+├── [ProjectName]/
+└── [ProjectName].Tests/
+    ├── ApiTests/
+    │   ├── UsersApiTests.cs
+    │   └── OrdersApiTests.cs
+    ├── Fakers/
+    │   ├── UserFaker.cs
+    │   └── OrderFaker.cs
+    └── Fixtures/
+        └── DatabaseFixture.cs
 ```

@@ -62,6 +62,10 @@ cp -r dotclaude/.claude your-project/
 npx degit CallumVass/dotclaude/.claude your-project/.claude
 ```
 
+> **Already have a `.claude/` folder?** Degit will refuse by default.
+> Back up your existing config first, or manually copy only the
+> `rules/` and `skills/` subdirectories you need.
+
 ### 2. Keep Rules for Your Stack
 
 Delete rules you don't need. All `.md` files in `.claude/rules/` auto-load:
