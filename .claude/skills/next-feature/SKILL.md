@@ -20,6 +20,8 @@ Guided feature development combining PROGRESS.md workflow with parallel subagent
 
 **Actor**: Main agent | **Context**: ~5%
 
+### Path A: PROGRESS.md exists
+
 1. Read `docs/PROGRESS.md`, find unchecked `[ ]` items in current phase
 2. Group related items (same subsection, dependencies, shared files)
 3. Apply steer hint if provided
@@ -42,6 +44,33 @@ Ready to start? (y/n)
 ```
 
 5. On confirmation: `git checkout -b feat/<feature-name>`
+
+### Path B: Ad-hoc feature (no PROGRESS.md or user describes feature)
+
+If user provides a feature description (e.g., "next feature which is to add user authentication"):
+
+1. Extract feature requirements from user's description
+2. Break down into discrete items/acceptance criteria
+3. Present to user:
+
+```
+## Ad-hoc Feature
+
+### Requirements (from your description)
+
+1. [ ] First requirement
+2. [ ] Second requirement
+3. [ ] Third requirement
+
+**Scope:** [Small/Medium/Large]
+**Branch:** `feat/[name]`
+
+Does this capture the feature correctly? (y/n)
+```
+
+4. On confirmation: `git checkout -b feat/<feature-name>`
+
+**Note**: Ad-hoc features won't update PROGRESS.md (it doesn't exist), but all other phases apply normally.
 
 ---
 
@@ -232,9 +261,11 @@ Ready to commit.
 
 ## Quick Reference
 
-- No PROGRESS.md? → Suggest `/init-project` first
+- No PROGRESS.md? → Use Path B (ad-hoc feature from user description)
+- User describes feature inline? → Use Path B even if PROGRESS.md exists
 - Subagents return summaries → Read key files they identify
 - User picks architecture → Don't proceed without selection
+- **Tests are MANDATORY** → Create boundary tests in Phase 5
 - **Review loop is MANDATORY** → Must run before Phase 7, no exceptions
 - Review loop runs in main → Plugin subagents can't be nested
 - Complete phases in order → Don't skip ahead
