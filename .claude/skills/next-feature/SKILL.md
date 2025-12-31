@@ -1,12 +1,6 @@
 ---
 name: next-feature
-description: |
-  Start work on a feature with guided workflow. Use when user:
-  - Says "next feature", "start the next feature", "what should we work on next"
-  - Describes a feature to implement: "let's work on...", "I want to add...", "implement...", "build..."
-  - Pastes requirements from JIRA, tickets, or other sources and wants to start work
-  - Asks to "add a feature" or "create a feature" for something specific
-  Works with PROGRESS.md if present, or ad-hoc from user's description.
+description: This skill should be used when the user asks to "work on the next feature", "start the next feature", "implement a feature", "add a feature", "build a feature", "let's work on", "I want to add", or describes a feature they want to implement. Also use when user pastes JIRA tickets, requirements, or feature descriptions and wants to start implementation.
 user_invocable: true
 arguments:
   - name: steer
