@@ -220,7 +220,7 @@ If no tests needed, explicitly justify why (e.g., "only changed private helper, 
 ```
 ╔═══════════════════════════════════════════════════════════════╗
 ║  MANDATORY: DO NOT SKIP THIS PHASE                            ║
-║  You MUST run the review loop before proceeding to Phase 7    ║
+║  You MUST run the review loop before proceeding to Phase 8    ║
 ║  Code is NOT ready to commit until reviewer returns clean     ║
 ╚═══════════════════════════════════════════════════════════════╝
 ```
@@ -250,16 +250,14 @@ Exit when reviewer returns "NO ISSUES FOUND".
 
 ---
 
-## Phase 7: Completion
+## Phase 8: Completion
 
 **Actor**: Main agent | **Context**: ~5%
 
-1. **Verify tests exist** for all new/modified boundary components
-   - If missing, create them before proceeding
-2. Run tests: `mix test` (or project equivalent)
-3. Fix any test failures
-4. Update `docs/PROGRESS.md`: mark items `[x]`
-5. Present summary:
+1. Run tests: `mix test` (or project equivalent)
+2. Fix any test failures
+3. Update `docs/PROGRESS.md`: mark items `[x]`
+4. Present summary:
 
 ```
 ## Feature Complete
@@ -287,9 +285,10 @@ Ready to commit.
 | 3. Clarification | ~5% | Main |
 | 4. Architecture | ~5% | Subagents (parallel) |
 | 5. Implementation | ~40% | Main |
-| 6. Review Loop | ~10% | Main (spawns reviewer) |
-| 7. Completion | ~5% | Main |
-| **Total** | **~75%** | |
+| 6. Testing | ~5% | Main |
+| 7. Review Loop | ~10% | Main (spawns reviewer) |
+| 8. Completion | ~5% | Main |
+| **Total** | **~80%** | |
 
 ---
 
@@ -299,7 +298,7 @@ Ready to commit.
 - User describes feature inline? → Use Path B even if PROGRESS.md exists
 - Subagents return summaries → Read key files they identify
 - User picks architecture → Don't proceed without selection
-- **Tests are MANDATORY** → Create boundary tests in Phase 5
-- **Review loop is MANDATORY** → Must run before Phase 7, no exceptions
+- **Testing is MANDATORY** → Phase 6, follow `.claude/rules/patterns.md`
+- **Review loop is MANDATORY** → Must run before Phase 8, no exceptions
 - Review loop runs in main → Plugin subagents can't be nested
 - Complete phases in order → Don't skip ahead
