@@ -19,6 +19,38 @@ Uses [beads](https://github.com/steveyegge/beads) for git-backed issue tracking 
 
 ## Process
 
+### 0. Beads Check (First!)
+
+Before anything else, verify beads is installed:
+
+```bash
+bd --version
+```
+
+**If beads is NOT installed**, ask the user:
+
+```
+Beads is required for task tracking but isn't installed.
+
+Would you like me to install it? (y/n)
+
+Installation options:
+1. npm install -g @beads/bd (recommended for most users)
+2. brew install steveyegge/beads/bd (macOS/Linux with Homebrew)
+3. go install github.com/steveyegge/beads/cmd/bd@latest (if you have Go)
+```
+
+If user says yes, run the appropriate install command based on their environment:
+- If `npm` is available: `npm install -g @beads/bd`
+- If `brew` is available (macOS/Linux): `brew install steveyegge/beads/bd`
+- If `go` is available: `go install github.com/steveyegge/beads/cmd/bd@latest`
+
+After installation, verify with `bd --version` before proceeding.
+
+If user says no, explain they can still create CLAUDE.md but beads features won't be available.
+
+---
+
 ### 1. Discovery Phase
 
 First, understand what we're working with:
@@ -285,8 +317,7 @@ Report migration summary:
 
 ## Notes
 
-- Always verify beads is installed before running `bd` commands
-- If beads is not installed, provide installation instructions
+- Beads installation is checked/offered in Step 0
 - Preserve any existing CLAUDE.md content while adding structure
 - Use `--json` flag for programmatic parsing of beads output
 - Rules are inlined once during init - no need for separate rule files in the project
