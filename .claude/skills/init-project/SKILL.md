@@ -248,15 +248,42 @@ bd create "Should we support SSO?" -t task -l question -p 3 --json
 - P2: Medium priority (nice-to-have)
 - P3: Low priority (future consideration)
 
-### 8. Output
+### 8. Cleanup
+
+After CLAUDE.md is created with inlined rules, remove the now-redundant rule files:
+
+```bash
+# Remove rules that were inlined into CLAUDE.md
+rm -rf .claude/rules/
+```
+
+Keep only:
+- `.claude/skills/` - still needed for skill definitions
+- `.claude/settings.local.json` - permissions (if present)
+- `.claude/templates/` - can be removed too (template was used, no longer needed)
+
+### 9. Output & Restart
 
 Report back with:
 
 1. Created/updated files (CLAUDE.md with inlined rules)
 2. Tech stack detected/selected
 3. Beads initialized: show `bd ready` output
-4. Next steps to start development
-5. Suggestion to use `/next-feature` to begin work
+4. Files cleaned up (rules removed)
+
+**Then instruct the user:**
+
+```
+## Setup Complete!
+
+Please restart Claude Code to pick up the new configuration:
+- CLAUDE.md with your project info and inlined rules
+- Beads hooks for task tracking
+
+After restart, run `/next-feature` to begin work.
+```
+
+**Important**: The restart is necessary for Claude to load the new CLAUDE.md context and beads hooks.
 
 ---
 
