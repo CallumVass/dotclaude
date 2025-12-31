@@ -8,7 +8,8 @@ Like dotfiles for your shell, this is a portable `.claude/` configuration with:
 
 - **Skills**: `/init-project`, `/next-feature`, `/review-loop`, `/browser-check`
 - **Rules**: Stack-specific patterns for TypeScript, .NET, and Elixir
-- **Templates**: PRD and progress tracking documents
+- **Templates**: CLAUDE.md template with architectural documentation
+- **Task Tracking**: Uses [beads](https://github.com/steveyegge/beads) for git-backed issue tracking
 
 ## Supported Stacks
 
@@ -21,6 +22,25 @@ Like dotfiles for your shell, this is a portable `.claude/` configuration with:
 | Elixir/Phoenix | Uses ecosystem tooling | Igniter, usage_rules, AGENTS.md |
 
 ## Prerequisites
+
+### Beads CLI (Required)
+
+This configuration requires [beads](https://github.com/steveyegge/beads) - a git-backed issue tracker designed for AI agents.
+
+Install beads:
+
+```bash
+# Via Homebrew (macOS/Linux)
+brew install steveyegge/beads/bd
+
+# Or via npm
+npm install -g @beads/bd
+
+# Or via Go
+go install github.com/steveyegge/beads/cmd/bd@latest
+```
+
+See the [beads documentation](https://github.com/steveyegge/beads#readme) for detailed setup instructions.
 
 ### Claude Code Settings
 
@@ -66,32 +86,23 @@ npx degit CallumVass/dotclaude/.claude your-project/.claude
 > Back up your existing config first, or manually copy only the
 > `rules/` and `skills/` subdirectories you need.
 
-### 2. Keep Rules for Your Stack
+### 2. Initialize Your Project
 
-Delete rules you don't need. All `.md` files in `.claude/rules/` auto-load:
+Run `/init-project` which will:
+- Ask for your tech stack (or auto-detect)
+- Create CLAUDE.md with inlined rules for your stack
+- Initialize beads for issue tracking
+- Set up the project structure
 
-```
-.claude/rules/
-├── patterns.md              # Keep - universal patterns
-├── typescript/              # Keep if using TypeScript
-├── dotnet/                  # Delete if not using .NET
-└── elixir/                  # Delete if not using Elixir
-```
+Rules are **inlined directly into CLAUDE.md** - no need to manage separate rule files in your project.
 
-For path-specific rules, add YAML frontmatter:
-
-```markdown
----
-paths: src/**/*.ts
----
-# These rules only apply to TypeScript files
-```
+> **Upgrading?** If you have existing `PROGRESS.md` or `PRD.md` files from an older dotclaude version, `/init-project` will offer to migrate them to beads.
 
 ### 3. Start Building
 
 ```
-/init-project    # Brainstorm, generate PRD & progress tracker
-/next-feature    # Full feature workflow with auto-review loop
+/init-project    # Initialize beads + create CLAUDE.md
+/next-feature    # Full feature workflow with beads tracking
 /review-loop     # Standalone review-fix cycle (used by next-feature)
 /browser-check   # UI verification with Playwright
 /commit          # Standardized conventional commits (built-in)
@@ -103,7 +114,19 @@ paths: src/**/*.ts
 /init-project → /next-feature → /commit → repeat
 ```
 
-`/next-feature` handles the full cycle: exploration, architecture, implementation, and review loop.
+- `/init-project` initializes beads, creates CLAUDE.md, and sets up issue hierarchy
+- `/next-feature` uses `bd ready` to find work, `bd close` to complete tasks
+- Beads syncs automatically with git for persistent tracking
+
+## Beads Commands
+
+| Action | Command |
+|--------|---------|
+| Find ready work | `bd ready` |
+| Show task details | `bd show <id>` |
+| Create new task | `bd create "Title" -t task -p 1` |
+| Complete task | `bd close <id>` |
+| Sync to git | `bd sync` |
 
 ## Elixir Projects
 
@@ -131,20 +154,21 @@ Phoenix 1.8+ generates `AGENTS.md` which Claude reads automatically.
 ```
 .claude/
 ├── settings.local.json     # Permissions
-├── rules/
+├── rules/                  # Reference rules (inlined by /init-project)
 │   ├── patterns.md         # Universal patterns
 │   ├── typescript/         # TS/Vue/React rules
 │   ├── dotnet/             # C#/F# rules
-│   └── elixir/             # Setup guide (defers to tooling)
+│   └── elixir/             # Ecosystem tooling guide
 ├── skills/
-│   ├── init-project/       # Project scaffolding
-│   ├── next-feature/       # Full feature workflow
-│   ├── review-loop/        # Iterative review-fix cycle
+│   ├── init-project/       # Beads init + rules inlining
+│   ├── next-feature/       # Feature workflow with beads
+│   ├── review-loop/        # Review-fix cycle
 │   └── browser-check/      # UI verification
 └── templates/
-    ├── PRD.md              # Product requirements
-    └── PROGRESS.md         # Progress tracker
+    └── CLAUDE.md           # Project template
 ```
+
+**Note**: The `rules/` folder contains reference rules that get inlined into your project's CLAUDE.md during `/init-project`. You don't need to copy these to your project separately.
 
 ## License
 

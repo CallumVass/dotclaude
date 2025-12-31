@@ -10,7 +10,7 @@ arguments:
 
 # Next Feature
 
-Guided feature development combining PROGRESS.md workflow with parallel subagents.
+Guided feature development using beads for task tracking and parallel subagents for exploration.
 
 **Philosophy**: Main agent coordinates, subagents do heavy lifting. Keep main context lean.
 
@@ -20,22 +20,23 @@ Guided feature development combining PROGRESS.md workflow with parallel subagent
 
 **Actor**: Main agent | **Context**: ~5%
 
-### Path A: PROGRESS.md exists
+### Path A: Beads issues exist
 
-1. Read `docs/PROGRESS.md`, find unchecked `[ ]` items in current phase
-2. Group related items (same subsection, dependencies, shared files)
-3. Apply steer hint if provided
-4. Present to user:
+1. Run `bd ready --json` to get unblocked tasks
+2. Parse JSON to identify available work items
+3. Group by parent (epic/feature) for related work
+4. Apply steer hint if provided to filter results
+5. Present to user:
 
 ```
-## Current Phase: [Phase Name]
+## Ready Work
 
-Progress: X/Y items complete
+**Epic:** Phase 1 - MVP (bd-abc123)
+**Feature:** User Authentication (bd-abc123.1)
 
-### Suggested Work Group
-
-1. [ ] First item
-2. [ ] Second item
+Ready tasks:
+1. Implement login endpoint (bd-abc123.1.1) - P1
+2. Add session handling (bd-abc123.1.2) - P1
 
 **Scope:** [Small/Medium/Large]
 **Branch:** `feat/[name]`
@@ -43,24 +44,26 @@ Progress: X/Y items complete
 Ready to start? (y/n)
 ```
 
-5. On confirmation: `git checkout -b feat/<feature-name>`
+6. On confirmation:
+   - `bd update <id> --status in_progress --json` for each task being worked on
+   - `git checkout -b feat/<feature-name>`
 
-### Path B: Ad-hoc feature (no PROGRESS.md or user describes feature)
+### Path B: Ad-hoc feature (user describes feature inline)
 
 If user provides a feature description (e.g., "next feature which is to add user authentication"):
 
 1. Extract feature requirements from user's description
-2. Break down into discrete items/acceptance criteria
+2. Break down into discrete tasks/acceptance criteria
 3. Present to user:
 
 ```
 ## Ad-hoc Feature
 
-### Requirements (from your description)
+### Tasks (from your description)
 
-1. [ ] First requirement
-2. [ ] Second requirement
-3. [ ] Third requirement
+1. First task
+2. Second task
+3. Third task
 
 **Scope:** [Small/Medium/Large]
 **Branch:** `feat/[name]`
@@ -68,9 +71,39 @@ If user provides a feature description (e.g., "next feature which is to add user
 Does this capture the feature correctly? (y/n)
 ```
 
-4. On confirmation: `git checkout -b feat/<feature-name>`
+4. On confirmation, **create beads issues first**:
+   ```bash
+   # Create a feature for this work
+   bd create "[Feature Name]" -t feature -p 1 --json
+   # Returns: {"id": "bd-xyz789", ...}
 
-**Note**: Ad-hoc features won't update PROGRESS.md (it doesn't exist), but all other phases apply normally.
+   # Create tasks under the feature
+   bd create "[Task 1]" -t task -p 1 --parent bd-xyz789 --json
+   # Returns: {"id": "bd-xyz789.1", ...}
+   bd create "[Task 2]" -t task -p 1 --parent bd-xyz789 --json
+   bd create "[Task 3]" -t task -p 1 --parent bd-xyz789 --json
+
+   # Mark tasks as in progress
+   bd update bd-xyz789.1 --status in_progress --json
+   bd update bd-xyz789.2 --status in_progress --json
+   bd update bd-xyz789.3 --status in_progress --json
+   ```
+
+5. Create branch: `git checkout -b feat/<feature-name>`
+
+6. Report created issues:
+   ```
+   ## Beads Issues Created
+
+   - bd-xyz789: [Feature Name]
+     - bd-xyz789.1: [Task 1] (in progress)
+     - bd-xyz789.2: [Task 2] (in progress)
+     - bd-xyz789.3: [Task 3] (in progress)
+
+   Proceeding to exploration...
+   ```
+
+**Important**: All work must be tracked in beads. This ensures completion is properly recorded and work can be resumed across sessions.
 
 ---
 
@@ -179,20 +212,20 @@ Present all approaches with trade-offs and your recommendation. Ask user to pick
 **Actor**: Main agent | **Context**: ~5%
 
 ```
-╔═══════════════════════════════════════════════════════════════╗
-║  DO NOT PROCEED TO REVIEW without completing this phase       ║
-║  Every boundary component changed MUST have a corresponding   ║
-║  test. A feature is NOT complete without tests.               ║
-╚═══════════════════════════════════════════════════════════════╝
++===============================================================+
+|  DO NOT PROCEED TO REVIEW without completing this phase       |
+|  Every boundary component changed MUST have a corresponding   |
+|  test. A feature is NOT complete without tests.               |
++===============================================================+
 ```
 
-Follow the testing patterns in `.claude/rules/patterns.md`:
+Follow the testing patterns in CLAUDE.md (Development Rules section):
 
 | When you change... | You must test... |
 |-------------------|------------------|
 | LiveView (`*_live.ex`) | LiveView test (`*_live_test.exs`) |
 | Controller | Controller test |
-| API endpoint | Request → response behavior |
+| API endpoint | Request -> response behavior |
 | Context module | Context test (if new public functions) |
 
 **Before proceeding, list the test files created/modified:**
@@ -212,11 +245,11 @@ If no tests needed, explicitly justify why (e.g., "only changed private helper, 
 **Actor**: Main agent | **Context**: ~10%
 
 ```
-╔═══════════════════════════════════════════════════════════════╗
-║  MANDATORY: DO NOT SKIP THIS PHASE                            ║
-║  You MUST run the review loop before proceeding to Phase 8    ║
-║  Code is NOT ready to commit until reviewer returns clean     ║
-╚═══════════════════════════════════════════════════════════════╝
++===============================================================+
+|  MANDATORY: DO NOT SKIP THIS PHASE                            |
+|  You MUST run the review loop before proceeding to Phase 8    |
+|  Code is NOT ready to commit until reviewer returns clean     |
++===============================================================+
 ```
 
 **NOTE**: Plugin subagent types cannot be spawned from nested subagents.
@@ -250,16 +283,20 @@ Exit when reviewer returns "NO ISSUES FOUND".
 
 1. Run tests: `mix test` (or project equivalent)
 2. Fix any test failures
-3. Update `docs/PROGRESS.md`: mark items `[x]`
-4. Present summary:
+3. Close completed beads:
+   ```bash
+   bd close <id> --reason "Implemented [brief description]" --json
+   ```
+4. Sync to git: `bd sync`
+5. Present summary:
 
 ```
 ## Feature Complete
 
 **Branch:** feat/[name]
-**Items completed:**
-- [x] Item 1
-- [x] Item 2
+**Issues closed:**
+- [x] bd-abc123.1.1 - Implement login endpoint
+- [x] bd-abc123.1.2 - Add session handling
 
 **Files changed:** [count]
 **Tests created:** [list test files]
@@ -286,13 +323,27 @@ Ready to commit.
 
 ---
 
+## Beads Command Reference
+
+| Action | Command |
+|--------|---------|
+| Find ready work | `bd ready --json` |
+| Claim task | `bd update <id> --status in_progress --json` |
+| Complete task | `bd close <id> --reason "..." --json` |
+| Sync to git | `bd sync` |
+| Show task details | `bd show <id> --json` |
+| Create ad-hoc task | `bd create "Title" -t task -p 1 --json` |
+
+---
+
 ## Quick Reference
 
-- No PROGRESS.md? → Use Path B (ad-hoc feature from user description)
-- User describes feature inline? → Use Path B even if PROGRESS.md exists
-- Subagents return summaries → Read key files they identify
-- User picks architecture → Don't proceed without selection
-- **Testing is MANDATORY** → Phase 6, follow `.claude/rules/patterns.md`
-- **Review loop is MANDATORY** → Must run before Phase 8, no exceptions
-- Review loop runs in main → Plugin subagents can't be nested
-- Complete phases in order → Don't skip ahead
+- No beads issues? -> Use Path B (creates issues from user description)
+- User describes feature inline? -> Use Path B even if beads exist
+- **Path B always creates beads** -> All work must be tracked
+- Subagents return summaries -> Read key files they identify
+- User picks architecture -> Don't proceed without selection
+- **Testing is MANDATORY** -> Phase 6, follow CLAUDE.md testing rules
+- **Review loop is MANDATORY** -> Must run before Phase 8, no exceptions
+- Review loop runs in main -> Plugin subagents can't be nested
+- Complete phases in order -> Don't skip ahead
