@@ -177,15 +177,43 @@ Present all approaches with trade-offs and your recommendation. Ask user to pick
 3. Implement step by step, marking todos complete as you go
 4. Follow codebase conventions strictly
 5. Keep changes focused - don't add unrequested features
-6. **Create boundary tests** for each component:
-   - LiveView → LiveView test
-   - Controller → Controller test
-   - API endpoint → API test
-   - Follow patterns in `.claude/rules/patterns.md`
 
 ---
 
-## Phase 6: Review Loop
+## Phase 6: Testing (MANDATORY)
+
+**Actor**: Main agent | **Context**: ~5%
+
+```
+╔═══════════════════════════════════════════════════════════════╗
+║  DO NOT PROCEED TO REVIEW without completing this phase       ║
+║  Every boundary component changed MUST have a corresponding   ║
+║  test. A feature is NOT complete without tests.               ║
+╚═══════════════════════════════════════════════════════════════╝
+```
+
+Follow the testing patterns in `.claude/rules/patterns.md`:
+
+| When you change... | You must test... |
+|-------------------|------------------|
+| LiveView (`*_live.ex`) | LiveView test (`*_live_test.exs`) |
+| Controller | Controller test |
+| API endpoint | Request → response behavior |
+| Context module | Context test (if new public functions) |
+
+**Before proceeding, list the test files created/modified:**
+
+```
+Tests created/modified:
+- [ ] test/..._test.exs - tests for X
+- [ ] test/..._test.exs - tests for Y
+```
+
+If no tests needed, explicitly justify why (e.g., "only changed private helper, tested via existing boundary test").
+
+---
+
+## Phase 7: Review Loop
 
 **Actor**: Main agent | **Context**: ~10%
 
