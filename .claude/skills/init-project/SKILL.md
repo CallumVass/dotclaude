@@ -250,17 +250,19 @@ bd create "Should we support SSO?" -t task -l question -p 3 --json
 
 ### 8. Cleanup
 
-After CLAUDE.md is created with inlined rules, remove the now-redundant rule files:
+After CLAUDE.md is created with inlined rules, remove redundant files:
 
 ```bash
-# Remove rules that were inlined into CLAUDE.md
+# Remove rules (now inlined into CLAUDE.md)
 rm -rf .claude/rules/
+
+# Remove templates (used once, no longer needed)
+rm -rf .claude/templates/
 ```
 
-Keep only:
-- `.claude/skills/` - still needed for skill definitions
-- `.claude/settings.local.json` - permissions (if present)
-- `.claude/templates/` - can be removed too (template was used, no longer needed)
+**Keep these** (still required):
+- `.claude/skills/` - needed for `/next-feature`, `/review-loop`, `/browser-check`
+- `.claude/settings.local.json` - permissions
 
 ### 9. Output & Restart
 
