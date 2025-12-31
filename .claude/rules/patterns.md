@@ -172,6 +172,20 @@ def valid_role?(role), do: role in @roles
 
 ## Testing Patterns
 
+### Tests Are Mandatory
+
+**Every feature implementation MUST include tests.** A feature is not complete without them.
+
+When creating or modifying a boundary component, create or update its corresponding test:
+
+| When you change... | You must test... |
+|-------------------|------------------|
+| API endpoint / Controller | Request → response behavior |
+| View / Page / LiveView | User interactions, renders |
+| CLI command | Input → output behavior |
+
+Do not consider work done until tests exist and pass.
+
 ### Core Philosophy: Boundary Testing
 
 Test at the boundaries where users interact with your system - APIs, Views, LiveViews. Use real implementations internally, only mocking external services.

@@ -142,6 +142,11 @@ Present all approaches with trade-offs and your recommendation. Ask user to pick
 3. Implement step by step, marking todos complete as you go
 4. Follow codebase conventions strictly
 5. Keep changes focused - don't add unrequested features
+6. **Create boundary tests** for each component:
+   - LiveView → LiveView test
+   - Controller → Controller test
+   - API endpoint → API test
+   - Follow patterns in `.claude/rules/patterns.md`
 
 ---
 
@@ -186,10 +191,12 @@ Exit when reviewer returns "NO ISSUES FOUND".
 
 **Actor**: Main agent | **Context**: ~5%
 
-1. Run tests: `mix test` (or project equivalent)
-2. Fix any test failures
-3. Update `docs/PROGRESS.md`: mark items `[x]`
-4. Present summary:
+1. **Verify tests exist** for all new/modified boundary components
+   - If missing, create them before proceeding
+2. Run tests: `mix test` (or project equivalent)
+3. Fix any test failures
+4. Update `docs/PROGRESS.md`: mark items `[x]`
+5. Present summary:
 
 ```
 ## Feature Complete
@@ -200,6 +207,7 @@ Exit when reviewer returns "NO ISSUES FOUND".
 - [x] Item 2
 
 **Files changed:** [count]
+**Tests created:** [list test files]
 **Review iterations:** [from subagent]
 
 Ready to commit.
