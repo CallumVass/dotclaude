@@ -1,6 +1,6 @@
 ---
 name: next-feature
-description: This skill should be used when the user asks to "work on the next feature", "start the next feature", "implement a feature", "add a feature", "build a feature", "let's work on", "I want to add", or describes a feature they want to implement. Also use when user pastes JIRA tickets, requirements, or feature descriptions and wants to start implementation.
+description: Use this skill when user says "next feature", "work on next feature", "lets work on", "let's work on", "start the next feature", "implement a feature", "add a feature", "build a feature", "I want to add", "what should I work on", or describes a feature to implement. Also use for JIRA tickets or feature descriptions. ALWAYS use this skill for feature work - do not use bd commands directly without going through this skill's phases.
 user_invocable: true
 arguments:
   - name: steer
