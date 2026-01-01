@@ -41,7 +41,6 @@ export function UserCard({ user, onEdit }: UserCardProps) {
 - Memoize expensive computations
 
 ```tsx
-// Custom hook
 function useUser(id: string) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
@@ -56,17 +55,6 @@ function useUser(id: string) {
 
   return { user, loading, error }
 }
-
-// Usage
-function UserProfile({ id }: { id: string }) {
-  const { user, loading, error } = useUser(id)
-
-  if (loading) return <Spinner />
-  if (error) return <Error message={error} />
-  if (!user) return <NotFound />
-
-  return <UserCard user={user} />
-}
 ```
 
 ---
@@ -80,85 +68,6 @@ function UserProfile({ id }: { id: string }) {
 | `useContext` | Shared state across tree (theme, auth) |
 | Zustand/Jotai | Global state with many consumers |
 | React Query/SWR | Server state (caching, revalidation) |
-
-### Context Pattern
-
-```tsx
-interface AuthContextValue {
-  user: User | null
-  login: (creds: Credentials) => Promise<void>
-  logout: () => void
-}
-
-const AuthContext = createContext<AuthContextValue | null>(null)
-
-export function useAuth() {
-  const context = useContext(AuthContext)
-  if (!context) {
-    throw new Error('useAuth must be used within AuthProvider')
-  }
-  return context
-}
-
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
-
-  const login = async (creds: Credentials) => {
-    const user = await AuthService.login(creds)
-    setUser(user)
-  }
-
-  const logout = () => setUser(null)
-
-  return (
-    <AuthContext.Provider value={{ user, login, logout }}>
-      {children}
-    </AuthContext.Provider>
-  )
-}
-```
-
----
-
-## Performance
-
-```tsx
-// Memoize expensive computations
-const sortedItems = useMemo(
-  () => items.sort((a, b) => a.name.localeCompare(b.name)),
-  [items]
-)
-
-// Memoize callbacks passed to children
-const handleClick = useCallback(
-  (id: string) => onItemClick(id),
-  [onItemClick]
-)
-
-// Memoize components that receive object/array props
-const MemoizedList = memo(function List({ items }: { items: Item[] }) {
-  return items.map(item => <Item key={item.id} {...item} />)
-})
-```
-
----
-
-## Styling
-
-Prefer utility-first CSS (Tailwind) or CSS Modules:
-
-```tsx
-// Tailwind (preferred)
-<div className="flex items-center gap-4 p-4 bg-gray-100 rounded-lg">
-
-// CSS Modules
-import styles from './Card.module.css'
-<div className={styles.card}>
-
-// Avoid inline styles for static values
-// Use them only for dynamic values
-<div style={{ height: `${dynamicHeight}px` }}>
-```
 
 ---
 
@@ -186,26 +95,6 @@ function Counter() {
 }
 ```
 
-### Data Fetching
-
-```tsx
-// Server Component - direct fetch
-async function Page() {
-  const data = await fetch('https://api.example.com/data')
-  return <Component data={data} />
-}
-
-// Client Component - React Query or SWR
-'use client'
-function Page() {
-  const { data, isLoading } = useQuery({
-    queryKey: ['data'],
-    queryFn: () => fetch('/api/data').then(r => r.json())
-  })
-  // ...
-}
-```
-
 ---
 
 ## Accessibility
@@ -213,7 +102,6 @@ function Page() {
 - Use semantic HTML (`button`, `nav`, `article`, etc.)
 - Add `aria-label` for icon-only buttons
 - Ensure keyboard navigation works
-- Use `role` attributes when semantic HTML isn't enough
 
 ```tsx
 <button

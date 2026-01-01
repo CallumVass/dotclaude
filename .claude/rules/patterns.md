@@ -2,7 +2,9 @@
 
 Universal patterns applicable across all tech stacks.
 
-## Guiding Principles
+---
+
+## Core Principles
 
 ### DRY (Don't Repeat Yourself)
 
@@ -24,11 +26,11 @@ Universal patterns applicable across all tech stacks.
 
 ### Balancing These Principles
 
-These principles exist in tension - dogmatic application of one can violate another:
+These principles exist in tension - dogmatic application of one violates another:
 
-- Aggressive DRY can create complex abstractions that violate KISS
+- Aggressive DRY creates complex abstractions that violate KISS
 - "Duplication is far cheaper than the wrong abstraction" - Sandi Metz
-- When in doubt, prefer simple duplicated code over a premature abstraction
+- When in doubt: simple duplicated code > premature abstraction
 
 ---
 
@@ -40,13 +42,11 @@ These principles exist in tension - dogmatic application of one can violate anot
 │  UI Components / Views / Pages      │
 │  - Render UI, handle user input     │
 │  - Call application layer           │
-│  - Use presentation utilities       │
 └───────────────┬─────────────────────┘
                 │
 ┌───────────────▼─────────────────────┐
 │            APPLICATION              │
 │  State Management / Services        │
-│  - Reactive state (if applicable)   │
 │  - Business logic orchestration     │
 │  - Coordinate domain + persistence  │
 └───────────────┬─────────────────────┘
@@ -56,7 +56,6 @@ These principles exist in tension - dogmatic application of one can violate anot
 │  Core Business Logic / Models       │
 │  - Pure functions preferred         │
 │  - No side effects where possible   │
-│  - Deterministic behavior           │
 └───────────────┬─────────────────────┘
                 │
 ┌───────────────▼─────────────────────┐
@@ -71,7 +70,7 @@ These principles exist in tension - dogmatic application of one can violate anot
 
 ## Result Type Pattern
 
-For operations that can fail, use explicit Result types instead of throwing/raising:
+For operations that can fail, use explicit Result types instead of throwing:
 
 **TypeScript:**
 ```typescript
@@ -84,24 +83,22 @@ type Result<T, E = string> =
 ```csharp
 public record Result<T>
 {
-    public bool Success { get; init; }
-    public T? Data { get; init; }
+    public bool IsSuccess { get; init; }
+    public T? Value { get; init; }
     public string? Error { get; init; }
 
-    public static Result<T> Ok(T data) => new() { Success = true, Data = data };
-    public static Result<T> Fail(string error) => new() { Success = false, Error = error };
+    public static Result<T> Success(T value) => new() { IsSuccess = true, Value = value };
+    public static Result<T> Failure(string error) => new() { IsSuccess = false, Error = error };
 }
 ```
 
 **F#:**
 ```fsharp
-type Result<'T, 'E> = Ok of 'T | Error of 'E
-// Built-in! Use it.
+type Result<'T, 'E> = Ok of 'T | Error of 'E  // Built-in!
 ```
 
 **Elixir:**
 ```elixir
-# Use {:ok, data} | {:error, reason} tuples - it's idiomatic!
 {:ok, user} = Users.get(id)
 {:error, :not_found} = Users.get(invalid_id)
 ```
@@ -110,7 +107,7 @@ type Result<'T, 'E> = Ok of 'T | Error of 'E
 
 ## Discriminated Unions / Tagged Unions
 
-Use these for type-safe handling of variant data:
+Type-safe handling of variant data:
 
 **TypeScript:**
 ```typescript
@@ -126,18 +123,6 @@ type Event =
     | UserCreated of userId: string
     | OrderPlaced of orderId: string * amount: decimal
     | PaymentFailed of reason: string
-```
-
-**Elixir:**
-```elixir
-# Use tagged tuples or structs with type field
-defmodule Event do
-  defstruct [:type, :payload]
-end
-
-# Or pattern match on tuple shapes
-{:user_created, user_id}
-{:order_placed, order_id, amount}
 ```
 
 ---
@@ -157,140 +142,143 @@ export type Role = typeof ROLES[number]
 public enum Role { Admin, User, Guest }
 ```
 
-**F#:**
-```fsharp
-type Role = Admin | User | Guest
-```
-
-**Elixir:**
-```elixir
-@roles [:admin, :user, :guest]
-def valid_role?(role), do: role in @roles
-```
-
 ---
 
-## Testing Patterns
+## Testing Requirements
 
-### Tests Are Mandatory
-
-**Every feature implementation MUST include tests.** A feature is not complete without them.
-
-When creating or modifying a boundary component, create or update its corresponding test:
-
-| When you change... | You must test... |
-|-------------------|------------------|
-| API endpoint / Controller | Request → response behavior |
-| View / Page / LiveView | User interactions, renders |
-| CLI command | Input → output behavior |
-
-Do not consider work done until tests exist and pass.
-
-### Core Philosophy: Boundary Testing
-
-Test at the boundaries where users interact with your system - APIs, Views, LiveViews. Use real implementations internally, only mocking external services.
+### The Rule
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    TEST BOUNDARY                        │
-│  ┌───────────────────────────────────────────────────┐  │
-│  │  HTTP Request / View Render                       │  │
-│  │         ↓                                         │  │
-│  │  Controller / LiveView                            │  │
-│  │         ↓                                         │  │
-│  │  Service Layer            ← All real              │  │
-│  │         ↓                   implementations       │  │
-│  │  Repository / Context                             │  │
-│  │         ↓                                         │  │
-│  └───────────────────────────────────────────────────┘  │
-│                       ↓                                 │
-│  ┌───────────────────────────────────────────────────┐  │
-│  │  Database / External APIs   ← Mock/fake here only │  │
-│  └───────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────┘
+╔═══════════════════════════════════════════════════════════════╗
+║  EVERY feature implementation MUST include tests.             ║
+║  A feature is NOT complete without them.                      ║
+║  This is enforced by the tests_before_review gate.            ║
+╚═══════════════════════════════════════════════════════════════╝
+```
+
+### What Must Be Tested
+
+```
+REQUIRE test_for_boundary:
+  
+  | When you change...        | You MUST test...              |
+  |---------------------------|-------------------------------|
+  | API endpoint / Controller | Request → response behavior   |
+  | View / Page / LiveView    | User interactions, renders    |
+  | Context module            | New public functions          |
+  | CLI command               | Input → output behavior       |
+
+VALID justification for no tests:
+  - "Changed private helper, covered by existing test at [path]"
+  - "Configuration-only change, no behavior to test"
+
+INVALID justification:
+  - "It's a small change"
+  - "It's obvious it works"
+  - "I tested it manually"
+```
+
+### Boundary Testing Philosophy
+
+Test at boundaries where users interact - APIs, Views, LiveViews. Use real implementations internally, only mock external services.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    TEST BOUNDARY                            │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │  HTTP Request / View Render                           │  │
+│  │         ↓                                             │  │
+│  │  Controller / LiveView                                │  │
+│  │         ↓                                             │  │
+│  │  Service Layer            ← All REAL implementations  │  │
+│  │         ↓                                             │  │
+│  │  Repository / Context                                 │  │
+│  └───────────────────────────────────────────────────────┘  │
+│                       ↓                                     │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │  Database / External APIs   ← Mock ONLY here          │  │
+│  └───────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 **Why this approach:**
 - Tests don't break when you refactor internals
 - Tests verify actual user-facing behavior
 - Less mocking = less test maintenance
-- Higher confidence the system actually works
-
-### What to Test
-
-| Boundary | What to Test | Mock Only |
-|----------|--------------|-----------|
-| API endpoints | HTTP request → response | Database, external APIs |
-| Views/Pages | User interactions, renders | Database, external APIs |
-| LiveViews | Real-time updates, events | Database, external APIs |
-| CLI commands | Input → output | File system, network |
+- Higher confidence the system works
 
 ### What NOT to Test Separately
 
-Don't create isolated unit tests for internal collaborators:
+```
+DO NOT create isolated unit tests for internal collaborators:
+
+  UserService      ← tested via API endpoint
+  UserRepository   ← tested via API endpoint  
+  UserValidator    ← tested via API endpoint
+
+DO test at the boundary:
+
+  GET /users       ← tests the full vertical slice
+```
+
+### Mocking Rules
 
 ```
-# Don't test these in isolation:
-UserService        ← tested via API endpoint
-UserRepository     ← tested via API endpoint
-UserValidator      ← tested via API endpoint
+ONLY mock external I/O:
+  - Database connections (or use in-memory/container)
+  - Third-party APIs (payment, email, SMS)
+  - File system, network, time
 
-# Do test at the boundary:
-GET /users         ← tests the full vertical slice
+NEVER mock your own code:
+  - Services, repositories, validators
+  - If you're mocking it, you're testing implementation not behavior
 ```
 
-### Test Data: Use Generators
+### Test Data
 
-Don't hand-craft test data. Use generators/factories:
+```
+REQUIRE generated test data:
+  
+  | Stack      | Library              |
+  |------------|----------------------|
+  | .NET       | AutoFixture, Bogus   |
+  | TypeScript | @faker-js/faker      |
+  | Elixir     | ExMachina            |
 
-| Stack | Library | Purpose |
-|-------|---------|---------|
-| .NET | AutoFixture, Bogus | Generate realistic test data |
-| TypeScript | @faker-js/faker | Generate realistic test data |
-| Elixir | ExMachina | Factory-based test data |
+DO NOT hand-craft test data - use factories/generators
+```
 
-### Test Structure (Arrange-Act-Assert)
+### Test Structure
 
 ```
 Arrange: Set up test data (via factories), configure test server
-Act:     Make HTTP request / render view / trigger event
+Act:     Make HTTP request / render view / trigger event  
 Assert:  Verify response status, body, side effects
 ```
-
-### When to Mock
-
-**Only mock external I/O:**
-- Database connections (or use in-memory/container)
-- Third-party APIs (payment, email, SMS)
-- File system, network, time
-
-**Never mock your own code:**
-- Services, repositories, validators
-- If you're mocking it, you're testing implementation not behavior
 
 ---
 
 ## Code Organization
 
-Prefer feature-based over layer-based organization:
-
 ```
-# Feature-based (preferred)
-features/
-  users/
-    components/
-    services/
-    types/
-  orders/
-    components/
-    services/
-    types/
+PREFER feature-based over layer-based:
 
-# Over layer-based
-components/
-  UserCard.vue
-  OrderList.vue
-services/
-  UserService.ts
-  OrderService.ts
+  # Feature-based (preferred)
+  features/
+    users/
+      components/
+      services/
+      types/
+    orders/
+      components/
+      services/
+      types/
+
+  # Layer-based (avoid)
+  components/
+    UserCard.vue
+    OrderList.vue
+  services/
+    UserService.ts
+    OrderService.ts
 ```

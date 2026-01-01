@@ -214,40 +214,7 @@ describe('Users API', () => {
     expect(response.status).toBe(201)
     expect(response.body.email).toBe(userData.email)
   })
-
-  it('POST /users rejects invalid email', async () => {
-    // Arrange
-    const userData = { email: 'not-an-email', name: 'Test' }
-
-    // Act
-    const response = await request(app)
-      .post('/api/users')
-      .send(userData)
-
-    // Assert
-    expect(response.status).toBe(400)
-  })
 })
-```
-
-### Test Data with Faker
-
-```typescript
-import { faker } from '@faker-js/faker'
-
-function createUser(overrides?: Partial<User>): User {
-  return {
-    id: faker.string.uuid(),
-    email: faker.internet.email(),
-    name: faker.person.fullName(),
-    createdAt: faker.date.past(),
-    ...overrides,
-  }
-}
-
-// Usage
-const users = Array.from({ length: 10 }, () => createUser())
-const admin = createUser({ role: 'admin' })
 ```
 
 ### Mock External APIs with MSW
@@ -257,35 +224,12 @@ import { setupServer } from 'msw/node'
 import { http, HttpResponse } from 'msw'
 
 const server = setupServer(
-  // Mock Stripe API
   http.post('https://api.stripe.com/v1/charges', () => {
     return HttpResponse.json({ id: 'ch_123', status: 'succeeded' })
-  }),
-
-  // Mock email service
-  http.post('https://api.sendgrid.com/v3/mail/send', () => {
-    return new HttpResponse(null, { status: 202 })
   })
 )
 
 beforeAll(() => server.listen())
 afterEach(() => server.resetHandlers())
 afterAll(() => server.close())
-```
-
-### Test Organization
-
-```
-src/
-├── api/
-│   └── users/
-│       └── route.ts
-└── __tests__/
-    ├── api/
-    │   ├── users.test.ts
-    │   └── orders.test.ts
-    ├── factories/
-    │   └── user.ts
-    └── mocks/
-        └── handlers.ts
 ```

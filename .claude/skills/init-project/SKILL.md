@@ -1,6 +1,6 @@
 ---
 name: init-project
-description: Initialize a new project with CLAUDE.md (including inlined rules) and beads issue tracking. Brainstorms ideas, asks clarifying questions, and sets up structured task tracking.
+description: Initialize a new project with CLAUDE.md and beads issue tracking. Use when user says "init project", "initialize", "set up project", "start new project", or wants to document an existing codebase.
 user_invocable: true
 arguments:
   - name: name
@@ -13,353 +13,310 @@ arguments:
 
 # Init Project
 
-Guides you through initializing a new project or documenting an existing one.
-
-Uses [beads](https://github.com/steveyegge/beads) for git-backed issue tracking and inlines relevant rules directly into CLAUDE.md.
-
-## Process
-
-### 0. Beads Check (First!)
-
-Before anything else, verify beads is installed:
-
-```bash
-bd --version
-```
-
-**If beads is NOT installed**, ask the user:
-
-```
-Beads is required for task tracking but isn't installed.
-
-Would you like me to install it? (y/n)
-
-Installation options:
-1. npm install -g @beads/bd (recommended for most users)
-2. brew install steveyegge/beads/bd (macOS/Linux with Homebrew)
-3. go install github.com/steveyegge/beads/cmd/bd@latest (if you have Go)
-```
-
-If user says yes, run the appropriate install command based on their environment:
-- If `npm` is available: `npm install -g @beads/bd`
-- If `brew` is available (macOS/Linux): `brew install steveyegge/beads/bd`
-- If `go` is available: `go install github.com/steveyegge/beads/cmd/bd@latest`
-
-After installation, verify with `bd --version` before proceeding.
-
-If user says no, explain they can still create CLAUDE.md but beads features won't be available.
+Initialize a project with CLAUDE.md (inlined rules) and beads issue tracking.
 
 ---
 
-### 1. Discovery Phase
-
-First, understand what we're working with:
-
-**For new projects:**
-- What problem are we solving?
-- Who are the users?
-- What's the core value proposition?
-- What tech stack are we using?
-
-**For existing projects:**
-- Scan the codebase structure
-- Identify the tech stack from config files
-- Understand current state
-- Check for existing PROGRESS.md/PRD.md (offer migration)
-
-### 2. Stack Detection
-
-If stack not provided, detect from these indicators:
-
-| Stack | Indicators |
-|-------|-----------|
-| TypeScript/Vue | `package.json` with vue, `nuxt.config.ts`, `.vue` files |
-| TypeScript/React | `package.json` with react, `next.config.js`, `.tsx` files |
-| .NET/C# | `*.csproj`, `*.sln`, `Program.cs` |
-| .NET/F# | `*.fsproj`, `*.fs` files |
-| Elixir | `mix.exs`, `*.ex` files, `lib/` folder |
-| Phoenix | `mix.exs` with phoenix dep, `_web/` folders |
-
-**If detection is ambiguous, ask the user:**
+## Constraints
 
 ```
-Which tech stack is this project using?
+REQUIRE beads_installed:
+  - Check `bd --version` BEFORE any other step
+  - If missing: offer installation, wait for confirmation
+  - If user declines: warn that beads features unavailable, continue without
 
-1. TypeScript/Vue
-2. TypeScript/React
-3. .NET/C#
-4. .NET/F#
-5. Elixir/Phoenix
+REQUIRE stack_confirmed:
+  - Never assume stack - detect OR ask user
+  - Ambiguous detection → ask user to pick
+
+INVARIANT preserve_existing:
+  - Never overwrite CLAUDE.md without asking
+  - Existing content merged, not replaced
+
+INVARIANT rules_inlined:
+  - Rules copied INTO CLAUDE.md, not referenced
+  - Source rule files deleted after inlining
 ```
-
-### 3. Migration Check
-
-**If `docs/PROGRESS.md` or `docs/PRD.md` exist:**
-
-Ask user: "Found existing PROGRESS.md/PRD.md. Import to beads? (y/n)"
-
-If yes, proceed to Migration section below before continuing.
-
-### 4. Brainstorming (New Projects)
-
-Ask clarifying questions:
-
-1. **Core Features**: What are the 3-5 must-have features for MVP?
-2. **User Flows**: What's the primary user journey?
-3. **Data Model**: What are the main entities?
-4. **Constraints**: Any technical requirements? (offline, real-time, etc.)
-5. **Timeline**: What's the scope? (weekend project vs. long-term)
-
-### 5. Generate CLAUDE.md with Inlined Rules
-
-Create `CLAUDE.md` that includes:
-1. Project-specific documentation (vision, stack, data model)
-2. Inlined rules from the detected stack
-
-**Read and inline these rule files based on stack:**
-
-| Stack | Rules to Inline |
-|-------|-----------------|
-| TypeScript/Vue | `patterns.md` + `typescript/core.md` + `typescript/vue.md` |
-| TypeScript/React | `patterns.md` + `typescript/core.md` + `typescript/react.md` |
-| .NET/C# | `patterns.md` + `dotnet/core.md` + `dotnet/csharp.md` |
-| .NET/F# | `patterns.md` + `dotnet/core.md` + `dotnet/fsharp.md` |
-| Elixir/Phoenix | `patterns.md` + `elixir/setup.md` |
-
-**CLAUDE.md Structure:**
-
-```markdown
-# [Project Name]
-
-## Overview
-
-[Brief description of what this project does]
-
-## Vision
-
-[One-liner describing the goal]
-
-## Problem
-
-[What problem does this solve?]
-
-## Users
-
-[Who is this for?]
-
-## Stack
-
-| Layer | Choice | Rationale |
-|-------|--------|-----------|
-| Frontend | [Choice] | [Why] |
-| Backend | [Choice] | [Why] |
-| Database | [Choice] | [Why] |
-
-## Key Commands
-
-```bash
-[dev command]      # Development
-[test command]     # Test
-[build command]    # Build
-```
-
-## Data Model
-
-### [Entity 1]
-
-- id, field1, field2
-
-### [Entity 2]
-
-- id, field1, field2
-
-## Architecture
-
-[High-level architecture notes]
-
-## Conventions
-
-- [Convention 1]
-- [Convention 2]
 
 ---
 
-*Run `bd ready` for available work. Run `bd show <id>` for task details.*
+## Modes
+
+```
+MODE new_project (default):
+  - Full brainstorming phase
+  - Create issue hierarchy from scratch
+
+MODE existing_project:
+  - WHEN: codebase files detected (package.json, mix.exs, *.csproj, etc.)
+  - SKIP: brainstorming
+  - DO: scan structure, detect conventions, document existing state
+
+MODE migration:
+  - WHEN: docs/PROGRESS.md OR docs/PRD.md exist
+  - DO: import existing items to beads before continuing
+  - THEN: archive originals to docs/archive/
+```
 
 ---
 
-# Development Rules
+## Phases
 
-[INLINE CONTENTS OF patterns.md HERE]
+### Phase 0: Beads Check
+
+```
+INPUTS: none
+OUTPUTS: beads_available (boolean)
+BLOCKS: all other phases if beads required
+
+CHECK: bd --version
+
+IF missing:
+  PROMPT: "Beads required but not installed. Install now? (y/n)"
+  
+  IF yes:
+    DETECT environment:
+      - npm available → npm install -g @beads/bd
+      - brew available → brew install steveyegge/beads/bd
+      - go available → go install github.com/steveyegge/beads/cmd/bd@latest
+    VERIFY: bd --version
+  
+  IF no:
+    WARN: "Continuing without beads - task tracking unavailable"
+    SET beads_available = false
+
+DONE WHEN: beads_available determined
+```
+
+### Phase 1: Discovery
+
+```
+INPUTS: existing files, user context
+OUTPUTS: project_type (new|existing), detected_stack, existing_docs[]
+
+SCAN for:
+  - package.json → TypeScript (check for vue/react)
+  - *.csproj/*.fsproj → .NET (check language)
+  - mix.exs → Elixir (check for phoenix)
+  - docs/PROGRESS.md, docs/PRD.md → migration candidates
+
+IF ambiguous stack:
+  ASK: "Which stack? 1) TS/Vue 2) TS/React 3) .NET/C# 4) .NET/F# 5) Elixir"
+  WAIT for answer
+
+DONE WHEN: stack confirmed by detection or user
+```
+
+### Phase 2: Migration Check
+
+```
+PRECONDITION: Phase 1 complete
+INPUTS: existing_docs[] from Phase 1
+OUTPUTS: migration_complete (boolean)
+
+IF docs/PROGRESS.md OR docs/PRD.md exist:
+  ASK: "Found existing PROGRESS.md/PRD.md. Import to beads? (y/n)"
+  
+  IF yes:
+    RUN migration subroutine (see Migration section)
+    SET migration_complete = true
+  
+  IF no:
+    SET migration_complete = false
+
+DONE WHEN: migration decision made and executed
+```
+
+### Phase 3: Brainstorming
+
+```
+PRECONDITION: Phase 2 complete
+CONDITION: MODE = new_project
+SKIP WHEN: MODE = existing_project
+
+INPUTS: user's project idea
+OUTPUTS: features[], entities[], constraints[], open_questions[]
+
+ASK (one at a time, wait for each):
+  1. "What problem does this solve?"
+  2. "Who are the users?"
+  3. "What are 3-5 must-have features for MVP?"
+  4. "What are the main data entities?"
+  5. "Any technical constraints? (offline, real-time, etc.)"
+
+SYNTHESIZE answers into structured lists
+
+DONE WHEN: user confirms feature list is complete
+```
+
+### Phase 4: Generate CLAUDE.md
+
+```
+PRECONDITION: stack confirmed
+INPUTS: detected_stack, features[], entities[] (if new project)
+OUTPUTS: CLAUDE.md file
+
+STRUCTURE:
+  1. Project header (name, overview, vision, problem, users)
+  2. Stack table with rationale
+  3. Key commands (dev, test, build)
+  4. Data model (entities)
+  5. Architecture notes
+  6. Conventions
+  7. Separator: "---"
+  8. Beads reference: "Run `bd ready` for work, `bd show <id>` for details"
+  9. Separator: "---"
+  10. INLINED patterns.md (remove YAML frontmatter)
+  11. Separator: "---"
+  12. INLINED stack rules (remove YAML frontmatter)
+
+INLINE these files based on stack:
+  | Stack          | Files to inline                                    |
+  |----------------|---------------------------------------------------|
+  | TypeScript/Vue | patterns.md + typescript/core.md + typescript/vue.md |
+  | TypeScript/React | patterns.md + typescript/core.md + typescript/react.md |
+  | .NET/C#        | patterns.md + dotnet/core.md + dotnet/csharp.md   |
+  | .NET/F#        | patterns.md + dotnet/core.md + dotnet/fsharp.md   |
+  | Elixir         | patterns.md + elixir/setup.md                     |
+
+DONE WHEN: CLAUDE.md created with all sections
+```
+
+### Phase 5: Initialize Beads
+
+```
+PRECONDITION: Phase 4 complete, beads_available = true
+SKIP WHEN: beads_available = false
+
+INPUTS: none
+OUTPUTS: beads initialized, hooks configured
+
+RUN:
+  bd init
+  bd setup claude --project
+  bd doctor
+
+IF bd doctor reports issues:
+  FOLLOW its suggestions before continuing
+
+IF AGENTS.md created by beads:
+  APPEND contents to CLAUDE.md under "## Beads Workflow"
+  DELETE AGENTS.md
+
+DONE WHEN: bd doctor passes
+```
+
+### Phase 6: Create Issue Hierarchy
+
+```
+PRECONDITION: Phase 5 complete (or skipped if no beads)
+CONDITION: beads_available = true
+SKIP WHEN: beads_available = false
+
+INPUTS: features[] from Phase 3
+OUTPUTS: epic_ids[], feature_ids[], task_ids[]
+
+STRUCTURE:
+  - Epics = Phases (Phase 1: MVP, Phase 2, etc.)
+  - Features = Feature groups
+  - Tasks = Individual work items
+  - Questions = Open items (label: question, priority: P3)
+
+FOR EACH phase:
+  CREATE epic: bd create "Phase N: [Name]" -t epic -p 0 --json
+  
+  FOR EACH feature group in phase:
+    CREATE feature: bd create "[Name]" -t feature --parent <epic-id> --json
+    
+    FOR EACH task in feature:
+      CREATE task: bd create "[Name]" -t task -p [1|2] --parent <feature-id> --json
+
+FOR EACH open question:
+  CREATE: bd create "[Question]" -t task -l question -p 3 --json
+
+DONE WHEN: all items created, bd ready shows tasks
+```
+
+### Phase 7: Cleanup
+
+```
+PRECONDITION: Phase 6 complete (or Phase 4 if no beads)
+
+INPUTS: none
+OUTPUTS: cleaned directory structure
+
+DELETE (now inlined into CLAUDE.md):
+  - .claude/rules/
+  - .claude/templates/
+
+KEEP (still required):
+  - .claude/skills/
+  - .claude/settings.local.json
+
+DONE WHEN: only skills and settings remain
+```
+
+### Phase 8: Report & Restart
+
+```
+PRECONDITION: Phase 7 complete
+
+OUTPUT to user:
+  1. Files created (CLAUDE.md)
+  2. Stack detected/selected
+  3. Beads status (bd ready output if available)
+  4. Files cleaned up
+
+INSTRUCT:
+  "## Setup Complete!
+   
+   Restart Claude Code to load the new configuration.
+   After restart, run `/next-feature` to begin work."
+
+DONE WHEN: user acknowledged
+```
 
 ---
 
-# [Stack Name] Rules
-
-[INLINE CONTENTS OF stack-specific rules HERE]
-```
-
-**Important**: When inlining rules, copy the full content but remove any YAML frontmatter (the `---` blocks at the top).
-
-### 6. Initialize Beads
-
-Run these commands to set up beads:
-
-```bash
-# Initialize beads in the project
-bd init
-
-# Set up Claude Code hooks (adds SessionStart/PreCompact hooks)
-bd setup claude --project
-
-# Verify setup is correct
-bd doctor
-```
-
-If `bd doctor` reports issues, follow its suggestions to fix them.
-
-**Important**: If beads creates an `AGENTS.md` file, Claude Code won't auto-read it. After beads init:
-
-1. Check if `AGENTS.md` was created
-2. If so, append its contents to the end of `CLAUDE.md` (under a `## Beads Workflow` section)
-3. Delete `AGENTS.md`
-
-This ensures Claude has the beads workflow instructions in its context.
-
-### 7. Create Issues from Brainstorming
-
-Convert the brainstormed features into a beads issue hierarchy:
-
-**Structure:**
-- **Epics** = Phases (Phase 1: MVP, Phase 2, etc.)
-- **Features** = Feature groups
-- **Tasks** = Individual work items
-
-**Example commands:**
-
-```bash
-# Create phase epic
-bd create "Phase 1: MVP" -t epic -p 0 --json
-# Returns: {"id": "bd-abc123", ...}
-
-# Create feature under epic
-bd create "User Authentication" -t feature --parent bd-abc123 --json
-# Returns: {"id": "bd-abc123.1", ...}
-
-# Create tasks under feature
-bd create "Implement login endpoint" -t task -p 1 --parent bd-abc123.1 --json
-bd create "Add session handling" -t task -p 1 --parent bd-abc123.1 --json
-bd create "Create registration form" -t task -p 2 --parent bd-abc123.1 --json
-
-# Open questions become labeled issues
-bd create "Should we support SSO?" -t task -l question -p 3 --json
-```
-
-**Priority levels:**
-- P0: Critical/blocking
-- P1: High priority (MVP must-have)
-- P2: Medium priority (nice-to-have)
-- P3: Low priority (future consideration)
-
-### 8. Cleanup
-
-After CLAUDE.md is created with inlined rules, remove redundant files:
-
-```bash
-# Remove rules (now inlined into CLAUDE.md)
-rm -rf .claude/rules/
-
-# Remove templates (used once, no longer needed)
-rm -rf .claude/templates/
-```
-
-**Keep these** (still required):
-- `.claude/skills/` - needed for `/next-feature`, `/review-loop`, `/browser-check`
-- `.claude/settings.local.json` - permissions
-
-### 9. Output & Restart
-
-Report back with:
-
-1. Created/updated files (CLAUDE.md with inlined rules)
-2. Tech stack detected/selected
-3. Beads initialized: show `bd ready` output
-4. Files cleaned up (rules removed)
-
-**Then instruct the user:**
+## Migration Subroutine
 
 ```
-## Setup Complete!
+TRIGGER: user accepts migration in Phase 2
 
-Please restart Claude Code to pick up the new configuration:
-- CLAUDE.md with your project info and inlined rules
-- Beads hooks for task tracking
+STEP 1 - Init beads:
+  bd init
+  bd setup claude --project
 
-After restart, run `/next-feature` to begin work.
+STEP 2 - Parse PROGRESS.md:
+  FOR EACH phase heading:
+    CREATE epic: bd create "Phase N: [Name]" -t epic -p 0 --json
+    
+    FOR EACH feature group (### heading):
+      CREATE feature: bd create "[Name]" -t feature --parent <epic-id> --json
+      
+      FOR EACH task line:
+        CREATE task: bd create "[Task]" -t task --parent <feature-id> --json
+        IF marked [x]:
+          IMMEDIATELY: bd close <task-id> --reason "Previously completed"
+
+STEP 3 - Parse PRD.md:
+  EXTRACT: Vision, Problem, Users, Stack, Data Model sections
+  MERGE into CLAUDE.md structure
+  
+  FOR EACH "Open Questions" item:
+    CREATE: bd create "[Question]" -t task -l question -p 3 --json
+
+STEP 4 - Archive:
+  mkdir -p docs/archive
+  mv docs/PROGRESS.md docs/archive/PROGRESS.md.bak
+  mv docs/PRD.md docs/archive/PRD.md.bak
+
+STEP 5 - Sync:
+  bd sync
+
+REPORT:
+  - Epics created: X
+  - Features created: X  
+  - Tasks created: X (Y already completed)
+  - Questions imported: X
 ```
-
-**Important**: The restart is necessary for Claude to load the new CLAUDE.md context and beads hooks.
-
----
-
-## Migration (from PROGRESS.md/PRD.md)
-
-If the user accepts migration from existing files:
-
-### Step 1: Initialize Beads
-
-```bash
-bd init
-bd setup claude --project
-```
-
-### Step 2: Parse and Import PROGRESS.md
-
-For each phase in PROGRESS.md:
-
-1. Create an epic: `bd create "Phase N: [Name]" -t epic -p 0 --json`
-
-For each feature group under the phase:
-
-2. Create a feature: `bd create "[Feature Group]" -t feature --parent <epic-id> --json`
-
-For each task in the feature group:
-
-3. Create a task: `bd create "[Task]" -t task --parent <feature-id> --json`
-4. If task was checked `[x]`, immediately close it: `bd close <task-id> --reason "Previously completed"`
-
-### Step 3: Parse and Import PRD.md
-
-1. Extract Vision/Problem/Users/Stack/Data Model sections
-2. Add these to CLAUDE.md (merge with existing if present)
-3. For any "Open Questions" items:
-   - `bd create "[Question]" -t task -l question -p 3 --json`
-
-### Step 4: Archive Original Files
-
-```bash
-mkdir -p docs/archive
-mv docs/PROGRESS.md docs/archive/PROGRESS.md.bak
-mv docs/PRD.md docs/archive/PRD.md.bak
-```
-
-### Step 5: Sync
-
-```bash
-bd sync
-```
-
-Report migration summary:
-- Epics created: X
-- Features created: X
-- Tasks created: X (Y already completed)
-- Open questions imported: X
-
----
-
-## Notes
-
-- Beads installation is checked/offered in Step 0
-- Preserve any existing CLAUDE.md content while adding structure
-- Use `--json` flag for programmatic parsing of beads output
-- Rules are inlined once during init - no need for separate rule files in the project

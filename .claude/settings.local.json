@@ -10,19 +10,20 @@
       "Bash(bd:*)",
       "Skill(next-feature)",
       "Skill(init-project)",
-      "Skill(review-merge)",
+      "Skill(review-loop)",
+      "Skill(write-human)",
       "Skill(commit)",
       "Skill(browser-check)",
       "Skill(feature-dev:feature-dev)",
-      "Skill(code-review:code-review)",
+
       "WebSearch",
       "Bash(gh repo sync:*)",
+      "Bash(gh pr create:*)",
       "WebFetch(domain:hexdocs.pm)",
-      "mcp__plugin_context7_context7__resolve-library-id",
-      "mcp__plugin_context7_context7__query-docs",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:raw.githubusercontent.com)",
-      "Bash(gh pr create:*)"
+      "mcp__plugin_context7_context7__resolve-library-id",
+      "mcp__plugin_context7_context7__query-docs"
     ]
   }
 }

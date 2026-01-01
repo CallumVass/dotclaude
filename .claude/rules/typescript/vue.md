@@ -127,37 +127,6 @@ Prefer utility-first CSS (Tailwind, UnoCSS) over scoped styles:
     <h1 class="text-xl font-bold mb-2">{{ title }}</h1>
   </div>
 </template>
-
-<!-- Avoid -->
-<template>
-  <div class="container">
-    <h1 class="title">{{ title }}</h1>
-  </div>
-</template>
-
-<style scoped>
-.container { /* ... */ }
-.title { /* ... */ }
-</style>
-```
-
-If using scoped styles is necessary, keep them minimal.
-
----
-
-## Reactivity Gotchas
-
-```typescript
-// Unwrap refs in templates automatically
-const count = ref(0)
-// Template: {{ count }} (not {{ count.value }})
-
-// Destructure reactive objects carefully
-const state = reactive({ name: 'test' })
-const { name } = toRefs(state) // Keeps reactivity
-
-// Use computed for derived state
-const doubled = computed(() => count.value * 2)
 ```
 
 ---
