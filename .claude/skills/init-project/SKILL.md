@@ -213,6 +213,14 @@ bd init
 bd setup claude --project
 ```
 
+**Important**: Beads creates an `AGENTS.md` file, but Claude Code doesn't auto-read it. After beads init:
+
+1. Read the generated `AGENTS.md`
+2. Append its contents to the end of `CLAUDE.md` (under a `## Beads Workflow` section)
+3. Delete `AGENTS.md`
+
+This ensures Claude has the beads workflow instructions in its context.
+
 ### 7. Create Issues from Brainstorming
 
 Convert the brainstormed features into a beads issue hierarchy:
