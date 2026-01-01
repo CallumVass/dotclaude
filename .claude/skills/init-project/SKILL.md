@@ -209,14 +209,19 @@ Run these commands to set up beads:
 # Initialize beads in the project
 bd init
 
-# Set up Claude Code hooks
+# Set up Claude Code hooks (adds SessionStart/PreCompact hooks)
 bd setup claude --project
+
+# Verify setup is correct
+bd doctor
 ```
 
-**Important**: Beads creates an `AGENTS.md` file, but Claude Code doesn't auto-read it. After beads init:
+If `bd doctor` reports issues, follow its suggestions to fix them.
 
-1. Read the generated `AGENTS.md`
-2. Append its contents to the end of `CLAUDE.md` (under a `## Beads Workflow` section)
+**Important**: If beads creates an `AGENTS.md` file, Claude Code won't auto-read it. After beads init:
+
+1. Check if `AGENTS.md` was created
+2. If so, append its contents to the end of `CLAUDE.md` (under a `## Beads Workflow` section)
 3. Delete `AGENTS.md`
 
 This ensures Claude has the beads workflow instructions in its context.
