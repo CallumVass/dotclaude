@@ -7,6 +7,7 @@
       "Bash(tree:*)",
       "Bash(dir:*)",
       "Bash(grep:*)",
+      "Bash(bd:*)",
       "Skill(next-feature)",
       "Skill(init-project)",
       "Skill(review-merge)",
