@@ -127,7 +127,7 @@ IF docs/PROGRESS.md OR docs/PRD.md exist:
 DONE WHEN: migration decision made and executed
 ```
 
-### Phase 3: Brainstorming
+### Phase 3: Brainstorming Interview
 
 ```
 PRECONDITION: Phase 2 complete
@@ -135,18 +135,57 @@ CONDITION: MODE = new_project
 SKIP WHEN: MODE = existing_project
 
 INPUTS: user's project idea
-OUTPUTS: features[], entities[], constraints[], open_questions[]
+OUTPUTS: spec document (features[], entities[], constraints[],
+         technical_decisions[], ux_patterns[], tradeoffs[], risks[])
 
-ASK (one at a time, wait for each):
-  1. "What problem does this solve?"
-  2. "Who are the users?"
-  3. "What are 3-5 must-have features for MVP?"
-  4. "What are the main data entities?"
-  5. "Any technical constraints? (offline, real-time, etc.)"
+STYLE:
+  - Use AskUserQuestion tool for structured choices where applicable
+  - Ask non-obvious questions that probe edge cases
+  - Explore tradeoffs, not just features
+  - Follow up where answers are thin
+  - Drive interview to completion - don't wait for user to end it
 
-SYNTHESIZE answers into structured lists
+INTERVIEW ROUNDS (adapt based on project type):
 
-DONE WHEN: user confirms feature list is complete
+  Round 1 - Problem Space:
+    - What happens if this problem isn't solved?
+    - Who else has tried? Why did they fail/succeed?
+    - What's the smallest version that would still be valuable?
+
+  Round 2 - User Behavior:
+    - What's the user's state of mind when they arrive?
+    - What action do they take immediately after using this?
+    - What would make them abandon it mid-task?
+
+  Round 3 - Technical Tradeoffs:
+    - Offline-first vs always-connected?
+    - Optimistic UI vs wait-for-server?
+    - Where does data live? Who owns it?
+    - What fails gracefully vs hard-fails?
+
+  Round 4 - Edge Cases & Risks:
+    - What happens at 10x scale? 100x?
+    - What's the worst misuse scenario?
+    - What data would be catastrophic to lose?
+
+  Round 5 - UX Decisions:
+    - Mobile-first or desktop-first?
+    - Wizard flow or single-page?
+    - Progressive disclosure or everything visible?
+
+CONTINUE UNTIL:
+  - Sufficient detail gathered to write comprehensive spec
+  - No obvious gaps in problem/solution/technical approach
+  - OR user signals early completion
+
+SIGNALS spec is complete:
+  - Core user flows are defined
+  - Data model is clear
+  - Key technical decisions made (auth, storage, real-time, etc.)
+  - Edge cases acknowledged
+  - MVP scope is bounded
+
+SYNTHESIZE into structured spec document before Phase 4
 ```
 
 ### Phase 4: Generate CLAUDE.md
