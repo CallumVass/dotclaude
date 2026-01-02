@@ -1,117 +1,200 @@
 ---
 name: review-loop
-description: Run iterative code review until clean. Use after making changes, on feature branches, or anytime you want automated review and fixes. Detects changed files from git diff.
+description: Iterative code review until clean. Use after making changes, before committing, on feature branches, or when user says "review", "check my code", "review loop", "run review".
 user_invocable: true
 arguments:
   - name: files
-    description: Optional specific files to review (defaults to git diff)
+    description: Specific files to review (defaults to git diff detection)
     required: false
 ---
 
 # Review Loop
 
-Iterative review-fix cycle using specialized code reviewer. Runs until no issues remain.
-
-**Use cases:**
-- After manual code changes
-- After `/next-feature` implementation
-- On any feature branch
-- Before committing
+Iterative review-fix cycle. Runs until reviewer returns clean.
 
 ---
 
-## Step 1: Detect Changed Files
+## Constraints
 
-If files argument provided, use those. Otherwise:
-
-```bash
-git diff --name-only HEAD~1  # or compare to main branch
 ```
+REQUIRE files_to_review:
+  Must have files to review - either provided or detected
+  Empty file list → inform user, exit gracefully
 
-Present to user:
-```
-## Review Loop
-
-Files to review:
-- path/to/file1.ts
-- path/to/file2.ts
-
-Starting review loop...
+REQUIRE main_agent_runs_loop:
+  Plugin subagents cannot spawn from nested subagents
+  Main agent MUST run this loop directly
+  
+INVARIANT all_issues_addressed:
+  Every issue either FIXED or DISMISSED with reason
+  No issues left unaddressed
 ```
 
 ---
 
-## Step 2: Run Review Loop
-
-Run this loop yourself until no issues remain:
-
-### 2a. REVIEW (spawn specialized reviewer)
-
-Use the Task tool with these parameters:
-- `subagent_type`: `feature-dev:code-reviewer`
-- `prompt`: Include the file list and review criteria
+## Inputs/Outputs
 
 ```
-Task(
-  subagent_type: "feature-dev:code-reviewer",
-  prompt: "Review these files: [list of files]
+INPUTS:
+  - files: explicit file list (optional)
+  - git diff: auto-detected if files not provided
 
-    Check for:
-    - Bugs and logic errors
-    - Security vulnerabilities
-    - Missing error handling
-    - Project convention violations
-    - Code quality issues
-
-    Return numbered list of issues with file:line references,
-    or 'NO ISSUES FOUND' if clean."
-)
+OUTPUTS:
+  - iterations: number of review cycles
+  - fixes_made[]: list of fixes applied
+  - dismissed[]: list of issues dismissed with reasons
+  - status: "clean" | "no_changes"
 ```
-
-### 2b. EVALUATE each issue
-
-For each issue returned, decide:
-- Is it a real problem? (not false positive)
-- Is it in scope? (not unrelated code)
-- Should it be fixed? (not intentional design)
-
-### 2c. FIX valid issues
-
-Use Edit tool to fix each valid issue. Track what you changed.
-Dismiss invalid issues with justification.
-
-### 2d. LOOP
-
-After fixing, spawn `feature-dev:code-reviewer` AGAIN.
-Fixes may introduce new issues.
-
-**REPEAT steps 2a-2d** until reviewer returns "NO ISSUES FOUND".
 
 ---
 
-## Step 3: Report Results
+## Process
 
-When subagent returns, present summary:
+### Step 1: Detect Files
 
 ```
-## Review Complete
+IF files argument provided:
+  USE provided files
+ELSE:
+  DETECT via git:
+    TRY: git diff --name-only HEAD~1
+    FALLBACK: git diff --name-only main
+    FALLBACK: git diff --name-only master
 
-**Iterations:** [count]
-**Fixes made:**
-- [fix 1]
-- [fix 2]
+IF no files detected:
+  INFORM: "No changed files detected. Nothing to review."
+  EXIT with status = "no_changes"
 
-**Dismissed (with reason):**
-- [issue]: [reason]
+PRESENT:
+  "## Review Loop
+  
+  Files to review:
+  - path/to/file1
+  - path/to/file2
+  
+  Starting review..."
+```
 
-Ready to commit.
+### Step 2: Review Loop
+
+```
+SET iteration = 0
+SET fixes_made = []
+SET dismissed = []
+
+LOOP:
+  iteration++
+  
+  ┌─────────────────────────────────────────────────────────┐
+  │ STEP 2a: SPAWN REVIEWER                                 │
+  └─────────────────────────────────────────────────────────┘
+  
+  SPAWN:
+    subagent_type: "feature-dev:code-reviewer"
+    prompt: "Review these files: [file_list]
+            
+            Check for:
+            - Bugs and logic errors
+            - Security vulnerabilities  
+            - Missing error handling
+            - Project convention violations
+            - Code quality issues
+            
+            Return numbered list with file:line references,
+            or 'NO ISSUES FOUND' if clean."
+  
+  WAIT for response
+  
+  ┌─────────────────────────────────────────────────────────┐
+  │ STEP 2b: CHECK EXIT CONDITION                           │
+  └─────────────────────────────────────────────────────────┘
+  
+  IF response contains "NO ISSUES FOUND":
+    EXIT loop with status = "clean"
+  
+  ┌─────────────────────────────────────────────────────────┐
+  │ STEP 2c: EVALUATE EACH ISSUE                            │
+  └─────────────────────────────────────────────────────────┘
+  
+  FOR EACH issue in response:
+    EVALUATE:
+      Q1: Is this a real problem? (not false positive)
+      Q2: Is it in scope? (not unrelated code)
+      Q3: Should it be fixed? (not intentional design)
+    
+    IF all yes → mark as VALID
+    IF any no → mark as INVALID with reason
+  
+  ┌─────────────────────────────────────────────────────────┐
+  │ STEP 2d: FIX OR DISMISS                                 │
+  └─────────────────────────────────────────────────────────┘
+  
+  FOR EACH valid issue:
+    FIX using Edit tool
+    APPEND to fixes_made[]:
+      { issue: "...", file: "...", fix: "..." }
+  
+  FOR EACH invalid issue:
+    APPEND to dismissed[]:
+      { issue: "...", reason: "..." }
+  
+  ┌─────────────────────────────────────────────────────────┐
+  │ STEP 2e: CONTINUE                                       │
+  └─────────────────────────────────────────────────────────┘
+  
+  NOTE: Fixes may introduce new issues
+  CONTINUE loop (spawn reviewer again)
+
+END LOOP
+```
+
+### Step 3: Report
+
+```
+PRESENT:
+  "## Review Complete
+  
+  **Status:** Clean
+  **Iterations:** [iteration]
+  
+  **Fixes made:**
+  - [fix 1 description]
+  - [fix 2 description]
+  
+  **Dismissed (with reason):**
+  - [issue]: [reason]
+  - [issue]: [reason]
+  
+  Ready to commit."
+
+IF called from /next-feature:
+  RETURN status to calling skill
+ELSE:
+  DONE
 ```
 
 ---
 
 ## Quick Reference
 
-- No changes detected? → Nothing to review
-- Main agent runs the loop → Spawns code-reviewer each iteration
-- All issues get addressed → Fixed or dismissed with reason
-- Plugin subagents can't be nested → Must spawn from main agent
+```
+TRIGGER: 
+  - Explicitly via /review-loop
+  - Called from /next-feature Phase 7
+  - User says "review my code", "check this"
+
+FILE DETECTION:
+  - Explicit files argument takes priority
+  - Falls back to git diff detection
+  - No files = nothing to do
+
+LOOP BEHAVIOR:
+  - Spawns reviewer each iteration
+  - Fixes may create new issues
+  - Exits ONLY when "NO ISSUES FOUND"
+
+ISSUE HANDLING:
+  - Valid issues get fixed
+  - Invalid issues get dismissed WITH reason
+  - No issues left unaddressed
+```

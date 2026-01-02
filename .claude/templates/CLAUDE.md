@@ -4,9 +4,25 @@
 
 {{BRIEF_DESCRIPTION}}
 
+## Vision
+
+{{ONE_LINER}}
+
+## Problem
+
+{{PROBLEM_DESCRIPTION}}
+
+## Users
+
+{{TARGET_USERS}}
+
 ## Stack
 
-{{LANGUAGE}} / {{FRAMEWORK}} / {{DATABASE}}
+| Layer | Choice | Rationale |
+|-------|--------|-----------|
+| Frontend | {{FRONTEND}} | {{WHY}} |
+| Backend | {{BACKEND}} | {{WHY}} |
+| Database | {{DATABASE}} | {{WHY}} |
 
 ## Key Commands
 
@@ -16,15 +32,37 @@
 {{BUILD_COMMAND}}    # Build
 ```
 
-## Conventions
+## Data Model
 
-- {{CONVENTION_1}}
-- {{CONVENTION_2}}
+### {{ENTITY_1}}
+
+- id, {{FIELD_1}}, {{FIELD_2}}
+
+### {{ENTITY_2}}
+
+- id, {{FIELD_1}}, {{FIELD_2}}
 
 ## Architecture
 
 {{KEY_ARCHITECTURE_NOTES}}
 
+## Conventions
+
+- {{CONVENTION_1}}
+- {{CONVENTION_2}}
+
 ---
 
-*See `docs/PRD.md` for requirements, `docs/PROGRESS.md` for status.*
+*Run `bd ready` for available work. Run `bd show <id>` for task details.*
+
+---
+
+# Development Rules
+
+{{INLINE_PATTERNS_RULES}}
+
+---
+
+# {{STACK_NAME}} Rules
+
+{{INLINE_STACK_RULES}}

@@ -1,6 +1,6 @@
 ---
 name: next-feature
-description: This skill should be used when the user asks to "work on the next feature", "start the next feature", "implement a feature", "add a feature", "build a feature", "let's work on", "I want to add", or describes a feature they want to implement. Also use when user pastes JIRA tickets, requirements, or feature descriptions and wants to start implementation.
+description: Feature development workflow with mandatory quality gates. Use when user says "next feature", "work on", "let's build", "implement", "add a feature", describes a feature, or pastes a JIRA ticket. ALWAYS use this skill for feature work.
 user_invocable: true
 arguments:
   - name: steer
@@ -10,289 +10,475 @@ arguments:
 
 # Next Feature
 
-Guided feature development combining PROGRESS.md workflow with parallel subagents.
+Guided feature development with beads tracking and mandatory quality gates.
 
-**Philosophy**: Main agent coordinates, subagents do heavy lifting. Keep main context lean.
-
----
-
-## Phase 1: Feature Selection
-
-**Actor**: Main agent | **Context**: ~5%
-
-### Path A: PROGRESS.md exists
-
-1. Read `docs/PROGRESS.md`, find unchecked `[ ]` items in current phase
-2. Group related items (same subsection, dependencies, shared files)
-3. Apply steer hint if provided
-4. Present to user:
-
-```
-## Current Phase: [Phase Name]
-
-Progress: X/Y items complete
-
-### Suggested Work Group
-
-1. [ ] First item
-2. [ ] Second item
-
-**Scope:** [Small/Medium/Large]
-**Branch:** `feat/[name]`
-
-Ready to start? (y/n)
-```
-
-5. On confirmation: `git checkout -b feat/<feature-name>`
-
-### Path B: Ad-hoc feature (no PROGRESS.md or user describes feature)
-
-If user provides a feature description (e.g., "next feature which is to add user authentication"):
-
-1. Extract feature requirements from user's description
-2. Break down into discrete items/acceptance criteria
-3. Present to user:
-
-```
-## Ad-hoc Feature
-
-### Requirements (from your description)
-
-1. [ ] First requirement
-2. [ ] Second requirement
-3. [ ] Third requirement
-
-**Scope:** [Small/Medium/Large]
-**Branch:** `feat/[name]`
-
-Does this capture the feature correctly? (y/n)
-```
-
-4. On confirmation: `git checkout -b feat/<feature-name>`
-
-**Note**: Ad-hoc features won't update PROGRESS.md (it doesn't exist), but all other phases apply normally.
+**Philosophy**: Main agent coordinates, subagents do heavy lifting. Gates are non-negotiable.
 
 ---
 
-## Phase 2: Codebase Exploration
-
-**Actor**: 2-3 parallel subagents | **Context**: ~5% (summaries only)
-
-Launch explorers in parallel with different focuses:
+## Gates (NEVER SKIP)
 
 ```
-Task(
-  subagent_type: "feature-dev:code-explorer",
-  prompt: "Find features similar to [feature] and trace their implementation.
-    Return: architecture patterns, key abstractions, 5-10 important files."
-)
+GATE tests_before_review:
+  Phase 7 (Review) BLOCKED until Phase 6 (Testing) complete
+  
+  REQUIRED: test_files[] is non-empty OR explicit_justification provided
+  EXPLICIT JUSTIFICATION must state why no tests needed
+  "It's a small change" is NOT valid justification
 
-Task(
-  subagent_type: "feature-dev:code-explorer",
-  prompt: "Map the architecture for [relevant area].
-    Return: component relationships, data flow, integration points."
-)
+GATE review_before_complete:
+  Phase 8 (Completion) BLOCKED until Phase 7 (Review) returns clean
+  
+  REQUIRED: reviewer returned "NO ISSUES FOUND"
+  No exceptions for "simple" changes
+  No manual override
 
-Task(
-  subagent_type: "feature-dev:code-explorer",
-  prompt: "Analyze [existing related feature] implementation.
-    Return: patterns used, extension points, conventions to follow."
-)
+GATE track_all_work:
+  ALL work creates beads issues
+  - Path A: uses existing issues
+  - Path B: creates issues before starting
+  
+  Completion BLOCKED until issues closed with reason
 ```
-
-After agents return, read the key files they identified to build understanding.
 
 ---
 
-## Phase 3: Clarifying Questions
+## Invariants
 
-**Actor**: Main agent | **Context**: ~5%
+```
+INVARIANT branch_per_feature:
+  Every feature gets its own branch: feat/<feature-name>
+  Never work directly on main/master
 
-**CRITICAL**: Do not skip. This catches requirements you haven't thought of.
+INVARIANT subagent_summaries_only:
+  Subagents return summaries, not full content
+  Main agent reads key files they identify
+  Keeps main context lean
 
-1. Review exploration findings and feature requirements
-2. Identify ambiguities:
-   - Edge cases and error handling
-   - Scope boundaries (what's in/out)
-   - Integration points
-   - User preferences that affect design
-3. Present questions using `AskUserQuestion`
-4. **Wait for answers before proceeding**
-
-If user says "whatever you think", give your recommendation and get confirmation.
+INVARIANT user_picks_architecture:
+  Phase 5 (Implementation) BLOCKED until user selects approach
+  "Whatever you think" → give recommendation, get explicit confirmation
+```
 
 ---
 
-## Phase 4: Architecture Design
-
-**Actor**: 2-3 parallel subagents | **Context**: ~5% (summaries only)
-
-Launch architects with different approaches:
+## Modes
 
 ```
-Task(
-  subagent_type: "feature-dev:code-architect",
-  prompt: "Design MINIMAL implementation for: [feature]
-    Requirements: [from Phase 1]
-    User decisions: [from Phase 3]
-    Constraints: Smallest change, maximum reuse of existing code.
-    Return: files to modify, changes needed, trade-offs."
-)
-
-Task(
-  subagent_type: "feature-dev:code-architect",
-  prompt: "Design CLEAN implementation for: [feature]
-    Requirements: [from Phase 1]
-    User decisions: [from Phase 3]
-    Constraints: Maintainability, elegant abstractions, future-proof.
-    Return: files to create/modify, component design, trade-offs."
-)
-
-Task(
-  subagent_type: "feature-dev:code-architect",
-  prompt: "Design PRAGMATIC implementation for: [feature]
-    Requirements: [from Phase 1]
-    User decisions: [from Phase 3]
-    Constraints: Balance speed and quality, practical for this scope.
-    Return: files to modify, implementation approach, trade-offs."
-)
-```
-
-Present all approaches with trade-offs and your recommendation. Ask user to pick.
-
----
-
-## Phase 5: Implementation
-
-**Actor**: Main agent | **Context**: ~40%
-
-1. Create todo list from chosen architecture's implementation steps
-2. Read all relevant files identified in exploration
-3. Implement step by step, marking todos complete as you go
-4. Follow codebase conventions strictly
-5. Keep changes focused - don't add unrequested features
-
----
-
-## Phase 6: Testing (MANDATORY)
-
-**Actor**: Main agent | **Context**: ~5%
-
-```
-╔═══════════════════════════════════════════════════════════════╗
-║  DO NOT PROCEED TO REVIEW without completing this phase       ║
-║  Every boundary component changed MUST have a corresponding   ║
-║  test. A feature is NOT complete without tests.               ║
-╚═══════════════════════════════════════════════════════════════╝
-```
-
-Follow the testing patterns in `.claude/rules/patterns.md`:
-
-| When you change... | You must test... |
-|-------------------|------------------|
-| LiveView (`*_live.ex`) | LiveView test (`*_live_test.exs`) |
-| Controller | Controller test |
-| API endpoint | Request → response behavior |
-| Context module | Context test (if new public functions) |
-
-**Before proceeding, list the test files created/modified:**
-
-```
-Tests created/modified:
-- [ ] test/..._test.exs - tests for X
-- [ ] test/..._test.exs - tests for Y
-```
-
-If no tests needed, explicitly justify why (e.g., "only changed private helper, tested via existing boundary test").
-
----
-
-## Phase 7: Review Loop
-
-**Actor**: Main agent | **Context**: ~10%
-
-```
-╔═══════════════════════════════════════════════════════════════╗
-║  MANDATORY: DO NOT SKIP THIS PHASE                            ║
-║  You MUST run the review loop before proceeding to Phase 8    ║
-║  Code is NOT ready to commit until reviewer returns clean     ║
-╚═══════════════════════════════════════════════════════════════╝
-```
-
-**NOTE**: Plugin subagent types cannot be spawned from nested subagents.
-The main agent must run this loop directly.
-
-### Loop until clean:
-
-1. **REVIEW**: Spawn the code reviewer
-   ```
-   Task(
-     subagent_type: "feature-dev:code-reviewer",
-     prompt: "Review these files: [list from implementation]
-       Check for: bugs, security issues, missing error handling, convention violations.
-       Return numbered list with file:line references, or 'NO ISSUES FOUND' if clean."
-   )
-   ```
-
-2. **EVALUATE**: For each issue - real problem? in scope? should fix?
-
-3. **FIX**: Use Edit tool for valid issues, dismiss others with justification
-
-4. **REPEAT**: Spawn code-reviewer again (fixes may introduce issues)
-
-Exit when reviewer returns "NO ISSUES FOUND".
-
----
-
-## Phase 8: Completion
-
-**Actor**: Main agent | **Context**: ~5%
-
-1. Run tests: `mix test` (or project equivalent)
-2. Fix any test failures
-3. Update `docs/PROGRESS.md`: mark items `[x]`
-4. Present summary:
-
-```
-## Feature Complete
-
-**Branch:** feat/[name]
-**Items completed:**
-- [x] Item 1
-- [x] Item 2
-
-**Files changed:** [count]
-**Tests created:** [list test files]
-**Review iterations:** [from subagent]
-
-Ready to commit.
+MODE full (default):
+  All 8 phases
+  Parallel subagents for exploration and architecture
+  
+MODE light:
+  TRIGGER: user says "quick fix", "small change", "just update"
+           OR estimated scope < 50 lines
+           OR single-file change
+  
+  SKIP: Phase 2 (Exploration), Phase 4 (Architecture)
+  KEEP: Phase 6 (Testing), Phase 7 (Review) ← NEVER SKIPPABLE
+  
+  EXPLICIT: Tell user "Using light mode - skipping exploration/architecture"
 ```
 
 ---
 
 ## Context Budget
 
-| Phase | Budget | Actor |
-|-------|--------|-------|
-| 1. Feature Selection | ~5% | Main |
-| 2. Exploration | ~5% | Subagents (parallel) |
-| 3. Clarification | ~5% | Main |
-| 4. Architecture | ~5% | Subagents (parallel) |
-| 5. Implementation | ~40% | Main |
-| 6. Testing | ~5% | Main |
-| 7. Review Loop | ~10% | Main (spawns reviewer) |
-| 8. Completion | ~5% | Main |
-| **Total** | **~80%** | |
+```
+| Phase                | Budget | Actor              |
+|----------------------|--------|--------------------|
+| 1. Feature Selection | ~5%    | Main               |
+| 2. Exploration       | ~5%    | Subagents          |
+| 3. Clarification     | ~5%    | Main               |
+| 4. Architecture      | ~5%    | Subagents          |
+| 5. Implementation    | ~40%   | Main               |
+| 6. Testing           | ~5%    | Main               |
+| 7. Review Loop       | ~10%   | Main → Subagent    |
+| 8. Completion        | ~5%    | Main               |
+| TOTAL                | ~80%   | Reserve 20%        |
+```
+
+---
+
+## Phases
+
+### Phase 1: Feature Selection
+
+```
+INPUTS: user request, optional steer hint, bd ready output
+OUTPUTS: selected_tasks[], branch_name, scope (small|medium|large)
+NEXT: Phase 2 (full) or Phase 3 (light)
+
+PATH A - Beads issues exist:
+  RUN: bd ready --json
+  PARSE: available work items
+  GROUP BY: parent (epic/feature)
+  FILTER BY: steer hint if provided
+  
+  PRESENT:
+    "## Ready Work
+    
+    **Epic:** [name] ([id])
+    **Feature:** [name] ([id])
+    
+    Ready tasks:
+    1. [task] ([id]) - [priority]
+    2. [task] ([id]) - [priority]
+    
+    **Scope:** [Small/Medium/Large]
+    **Branch:** feat/[name]
+    
+    Ready to start? (y/n)"
+  
+  ON confirm:
+    FOR EACH task: bd update <id> --status in_progress --json
+    RUN: git checkout -b feat/<feature-name>
+
+PATH B - Ad-hoc feature (user describes feature inline):
+  EXTRACT: requirements from description
+  BREAK DOWN: into discrete tasks
+  
+  PRESENT:
+    "## Ad-hoc Feature
+    
+    ### Tasks
+    1. [task]
+    2. [task]
+    3. [task]
+    
+    **Scope:** [Small/Medium/Large]
+    **Branch:** feat/[name]
+    
+    Does this capture it? (y/n)"
+  
+  ON confirm:
+    CREATE feature: bd create "[Feature]" -t feature -p 1 --json
+    FOR EACH task:
+      CREATE: bd create "[Task]" -t task -p 1 --parent <feature-id> --json
+      UPDATE: bd update <task-id> --status in_progress --json
+    RUN: git checkout -b feat/<feature-name>
+    
+    REPORT created issues before proceeding
+
+DETERMINE mode:
+  IF scope = small OR user said "quick"/"small": MODE = light
+  ELSE: MODE = full
+
+DONE WHEN: branch created, tasks marked in_progress, mode determined
+```
+
+### Phase 2: Exploration
+
+```
+CONDITION: MODE = full
+SKIP WHEN: MODE = light
+
+INPUTS: feature requirements from Phase 1
+OUTPUTS: key_files[], patterns[], architecture_notes[]
+NEXT: Phase 3
+
+SPAWN parallel subagents:
+
+  TASK 1 (similar features):
+    subagent_type: "feature-dev:code-explorer"
+    prompt: "Find features similar to [feature] and trace implementation.
+            Return: architecture patterns, key abstractions, 5-10 important files."
+
+  TASK 2 (area mapping):
+    subagent_type: "feature-dev:code-explorer"  
+    prompt: "Map architecture for [relevant area].
+            Return: component relationships, data flow, integration points."
+
+  TASK 3 (existing patterns):
+    subagent_type: "feature-dev:code-explorer"
+    prompt: "Analyze [related feature] implementation.
+            Return: patterns used, extension points, conventions to follow."
+
+WAIT for all subagents
+
+COLLECT: summaries only (not full file contents)
+READ: key files identified by subagents
+
+DONE WHEN: key_files populated, patterns documented
+```
+
+### Phase 3: Clarification
+
+```
+INPUTS: exploration findings (if full mode), feature requirements
+OUTPUTS: user_decisions[], resolved_ambiguities[]
+NEXT: Phase 4 (full) or Phase 5 (light)
+
+NEVER SKIP this phase - even in light mode
+
+IDENTIFY ambiguities:
+  - Edge cases and error handling
+  - Scope boundaries (what's in/out)
+  - Integration points with existing code
+  - User preferences affecting design
+
+IF ambiguities found:
+  PRESENT questions using AskUserQuestion
+  WAIT for answers - do not proceed without them
+  
+  IF user says "whatever you think":
+    GIVE explicit recommendation
+    GET confirmation before proceeding
+
+IF no ambiguities:
+  CONFIRM: "No clarifying questions - proceeding to [architecture/implementation]"
+
+DONE WHEN: all ambiguities resolved or confirmed none exist
+```
+
+### Phase 4: Architecture Design
+
+```
+CONDITION: MODE = full
+SKIP WHEN: MODE = light
+
+PRECONDITION: Phase 3 complete
+INPUTS: requirements, user_decisions, exploration findings
+OUTPUTS: chosen_approach, implementation_steps[]
+NEXT: Phase 5
+
+SPAWN parallel subagents with DIFFERENT approaches:
+
+  TASK 1 (minimal):
+    subagent_type: "feature-dev:code-architect"
+    prompt: "Design MINIMAL implementation for: [feature]
+            Requirements: [from Phase 1]
+            User decisions: [from Phase 3]
+            Constraints: Smallest change, maximum reuse.
+            Return: files to modify, changes needed, trade-offs."
+
+  TASK 2 (clean):
+    subagent_type: "feature-dev:code-architect"
+    prompt: "Design CLEAN implementation for: [feature]
+            Requirements: [from Phase 1]
+            User decisions: [from Phase 3]
+            Constraints: Maintainability, elegant abstractions.
+            Return: files to create/modify, component design, trade-offs."
+
+  TASK 3 (pragmatic):
+    subagent_type: "feature-dev:code-architect"
+    prompt: "Design PRAGMATIC implementation for: [feature]
+            Requirements: [from Phase 1]
+            User decisions: [from Phase 3]
+            Constraints: Balance speed and quality.
+            Return: files to modify, approach, trade-offs."
+
+WAIT for all subagents
+
+PRESENT all three approaches:
+  - Summary of each
+  - Trade-offs comparison
+  - Your recommendation with reasoning
+
+ASK user to pick (1/2/3)
+WAIT for selection - BLOCKED until user chooses
+
+DONE WHEN: user selected approach
+```
+
+### Phase 5: Implementation
+
+```
+PRECONDITION: Phase 3 complete (light) OR Phase 4 complete (full)
+INPUTS: chosen_approach (full) OR requirements (light), key_files
+OUTPUTS: files_changed[], implementation_complete
+NEXT: Phase 6
+
+USES: ~40% of context budget
+
+STEPS:
+  1. CREATE todo list from implementation steps
+  2. READ all relevant files identified in exploration
+  3. FOR EACH todo:
+     - Implement the change
+     - Mark todo complete
+     - Stay focused - no unrequested features
+  4. FOLLOW codebase conventions strictly
+
+TRACK: files_changed[] for Phase 6 and 7
+
+DONE WHEN: all todos complete, feature functional
+```
+
+### Phase 6: Testing
+
+```
+PRECONDITION: Phase 5 complete
+INPUTS: files_changed[]
+OUTPUTS: test_files[], justification (if no tests)
+NEXT: Phase 7
+BLOCKS: Phase 7 (via tests_before_review gate)
+
+╔═══════════════════════════════════════════════════════════════╗
+║  THIS PHASE IS MANDATORY - NO EXCEPTIONS                      ║
+║  Even in light mode. Even for "small" changes.                ║
+╚═══════════════════════════════════════════════════════════════╝
+
+RULES (from CLAUDE.md patterns):
+  | Changed                  | Must test                    |
+  |--------------------------|------------------------------|
+  | API endpoint/Controller  | Request → response behavior  |
+  | View/Page/LiveView       | User interactions, renders   |
+  | Context module           | New public functions         |
+  | CLI command              | Input → output behavior      |
+
+FOR EACH boundary component in files_changed:
+  IF no corresponding test exists:
+    CREATE test file
+  ELSE:
+    UPDATE existing test
+
+BEFORE proceeding, LIST:
+  "Tests created/modified:
+   - [ ] path/to/test1 - tests for X
+   - [ ] path/to/test2 - tests for Y"
+
+IF genuinely no tests needed:
+  PROVIDE explicit justification
+  VALID: "Only changed private helper, covered by existing boundary test at [path]"
+  INVALID: "It's a small change" / "It's obvious it works"
+
+RUN tests: mix test / npm test / dotnet test (project appropriate)
+
+DONE WHEN: test_files[] documented OR explicit justification provided
+```
+
+### Phase 7: Review Loop
+
+```
+PRECONDITION: Phase 6 complete (tests documented or justified)
+INPUTS: files_changed[], test_files[]
+OUTPUTS: review_iterations, fixes_made[], dismissed[]
+NEXT: Phase 8
+BLOCKS: Phase 8 (via review_before_complete gate)
+
+╔═══════════════════════════════════════════════════════════════╗
+║  THIS PHASE IS MANDATORY - NO EXCEPTIONS                      ║
+║  Code is NOT ready until reviewer returns "NO ISSUES FOUND"   ║
+╚═══════════════════════════════════════════════════════════════╝
+
+NOTE: Plugin subagents cannot spawn from nested subagents.
+      Main agent MUST run this loop directly.
+
+LOOP:
+  iteration = 0
+  
+  REPEAT:
+    iteration++
+    
+    SPAWN reviewer:
+      subagent_type: "feature-dev:code-reviewer"
+      prompt: "Review these files: [files_changed + test_files]
+              
+              Check for:
+              - Bugs and logic errors
+              - Security vulnerabilities
+              - Missing error handling
+              - Convention violations
+              - Code quality issues
+              
+              Return numbered list with file:line references,
+              or 'NO ISSUES FOUND' if clean."
+    
+    WAIT for reviewer
+    
+    IF "NO ISSUES FOUND":
+      EXIT loop
+    
+    FOR EACH issue:
+      EVALUATE:
+        - Real problem? (not false positive)
+        - In scope? (not unrelated code)
+        - Should fix? (not intentional design)
+      
+      IF valid: FIX using Edit tool, add to fixes_made[]
+      IF invalid: DISMISS with reason, add to dismissed[]
+    
+    CONTINUE loop (fixes may introduce new issues)
+
+DONE WHEN: reviewer returned "NO ISSUES FOUND"
+```
+
+### Phase 8: Completion
+
+```
+PRECONDITION: Phase 7 returned clean
+INPUTS: selected_tasks[], files_changed[], test_files[], review_iterations
+OUTPUTS: feature complete, beads closed
+
+STEPS:
+  1. RUN tests (final verification):
+     mix test / npm test / dotnet test
+     
+     IF failures: FIX and return to Phase 7
+  
+  2. CLOSE beads:
+     FOR EACH task in selected_tasks:
+       bd close <id> --reason "Implemented: [brief description]" --json
+  
+  3. SYNC: bd sync
+
+PRESENT summary:
+  "## Feature Complete
+  
+  **Branch:** feat/[name]
+  **Issues closed:**
+  - [x] [id] - [description]
+  - [x] [id] - [description]
+  
+  **Files changed:** [count]
+  **Tests created:** [list]
+  **Review iterations:** [count]
+  **Fixes made:** [count]
+  
+  Ready to commit."
+
+DONE WHEN: all tasks closed, summary presented
+```
 
 ---
 
 ## Quick Reference
 
-- No PROGRESS.md? → Use Path B (ad-hoc feature from user description)
-- User describes feature inline? → Use Path B even if PROGRESS.md exists
-- Subagents return summaries → Read key files they identify
-- User picks architecture → Don't proceed without selection
-- **Testing is MANDATORY** → Phase 6, follow `.claude/rules/patterns.md`
-- **Review loop is MANDATORY** → Must run before Phase 8, no exceptions
-- Review loop runs in main → Plugin subagents can't be nested
-- Complete phases in order → Don't skip ahead
+```
+PATH SELECTION:
+  - Beads issues exist? → Path A (use existing)
+  - User describes feature? → Path B (create issues first)
+  - Path B ALWAYS creates beads before starting
+
+MODE SELECTION:
+  - "quick fix" / "small change" / < 50 lines → light mode
+  - Everything else → full mode
+  - Light mode skips exploration + architecture
+  - Light mode KEEPS testing + review
+
+GATES (cannot bypass):
+  - tests_before_review: Phase 6 → Phase 7
+  - review_before_complete: Phase 7 clean → Phase 8
+  - track_all_work: issues created AND closed
+
+SUBAGENT RULES:
+  - Summaries only returned to main
+  - Main reads files they identify
+  - Plugin subagents can't nest (review runs from main)
+```
+
+---
+
+## Beads Commands
+
+```
+| Action         | Command                                    |
+|----------------|--------------------------------------------|
+| Find work      | bd ready --json                            |
+| Claim task     | bd update <id> --status in_progress --json |
+| Complete task  | bd close <id> --reason "..." --json        |
+| Create task    | bd create "Title" -t task -p 1 --json      |
+| Show details   | bd show <id> --json                        |
+| Sync to git    | bd sync                                    |
+```
