@@ -4,6 +4,30 @@
 
 {{BRIEF_DESCRIPTION}}
 
+## Work Initiation Protocol
+
+**ALL work MUST go through beads.** Before starting ANY implementation:
+
+1. **Check for existing issue**: `bd ready` or `bd list --status=open`
+2. **If no issue exists, create one first**:
+   ```bash
+   bd create --title="<brief description>" --type=task|bug|feature --priority=2
+   ```
+3. **Run the next-feature skill** to execute the work:
+   ```
+   /next-feature
+   ```
+
+The `next-feature` skill handles: picking up the issue, planning, implementation, and beads status updates.
+
+**This applies to ALL requests:**
+- Explicit features ("add dark mode")
+- Ad-hoc cleanup ("tidy up the boilerplate")
+- Bug fixes ("fix the login error")
+- Refactoring ("clean up this module")
+
+**No code changes without a tracking issue. No implementation without next-feature.**
+
 ## Vision
 
 {{ONE_LINER}}
