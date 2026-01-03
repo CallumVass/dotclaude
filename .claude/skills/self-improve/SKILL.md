@@ -35,18 +35,21 @@ This skill runs a complete feedback loop:
 ## Usage
 
 ```
-/self-improve                    # Run with default template (todo-api)
-/self-improve vue-dashboard      # Run with specific template
-/self-improve todo-api --auto-pr # Auto-create PR when done
+/self-improve                              # Run with default template (fsharp-api)
+/self-improve fsharp-api                   # F# Minimal API (default)
+/self-improve todo-api                     # TypeScript Express API
+/self-improve fsharp-api --max-iterations 5  # Limit iterations
+/self-improve fsharp-api --auto-pr         # Auto-create PR when done
 ```
 
 ---
 
 ## Available Templates
 
-| Template | Description | Beads |
-|----------|-------------|-------|
-| `todo-api` | TypeScript REST API with Express | 7 tasks |
+| Template | Description | Stack | Beads |
+|----------|-------------|-------|-------|
+| `fsharp-api` | F# Minimal API (ReadingList) | .NET 8, F#, xUnit | 7 tasks |
+| `todo-api` | TypeScript REST API | Node, Express, Vitest | 7 tasks |
 
 Templates are in `.claude/sandbox/templates/`.
 
@@ -81,6 +84,24 @@ Templates are in `.claude/sandbox/templates/`.
 - Pushes experiment branch
 - Creates PR (if --auto-pr)
 - Includes summary and diff
+
+---
+
+## Success Criteria
+
+The experiment tracks these criteria automatically:
+
+| Criterion | How It's Verified |
+|-----------|-------------------|
+| `init_project_ran` | CLAUDE.md file exists |
+| `next_feature_ran` | Session logs contain next-feature activity |
+| `review_loop_executed` | Session logs contain review activity |
+| `tests_written` | Test files found in project |
+| `all_beads_completed` | `bd ready` returns empty |
+| `build_passes` | `dotnet build` / `npm run build` succeeds |
+| `tests_pass` | `dotnet test` / `npm test` succeeds |
+
+Results are saved to `success-criteria.json` and displayed at the end.
 
 ---
 

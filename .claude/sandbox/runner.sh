@@ -1,11 +1,11 @@
 #!/bin/bash
 #
-# Autonomous Experiment Runner (In-Repo Version)
+# Autonomous Experiment Runner
 #
-# Runs experiments within the dotclaude repo itself, in a dedicated branch.
-# When complete, creates a PR with rule improvements.
+# Runs experiments within the dotclaude repo, testing conventions and
+# collecting feedback for rule improvements.
 #
-# Usage: ./runner.sh <template-name> [--auto-pr]
+# Usage: ./runner.sh <template-name> [--max-iterations N] [--auto-pr]
 #
 
 set -e
@@ -19,16 +19,40 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
+CYAN='\033[0;36m'
 NC='\033[0m'
 
 log_info() { echo -e "${GREEN}[INFO]${NC} $1"; }
 log_warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 log_step() { echo -e "${BLUE}[STEP]${NC} $1"; }
+log_success() { echo -e "${CYAN}[SUCCESS]${NC} $1"; }
 
 # Parse arguments
-TEMPLATE_NAME="${1:-todo-api}"
-AUTO_PR="${2:-}"
+TEMPLATE_NAME=""
+MAX_ITERATIONS=10
+AUTO_PR=false
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --max-iterations)
+            MAX_ITERATIONS="$2"
+            shift 2
+            ;;
+        --auto-pr)
+            AUTO_PR=true
+            shift
+            ;;
+        *)
+            if [[ -z "$TEMPLATE_NAME" ]]; then
+                TEMPLATE_NAME="$1"
+            fi
+            shift
+            ;;
+    esac
+done
+
+TEMPLATE_NAME="${TEMPLATE_NAME:-fsharp-api}"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 EXPERIMENT_ID="${TEMPLATE_NAME}-${TIMESTAMP}"
 EXPERIMENT_BRANCH="experiment/${EXPERIMENT_ID}"
@@ -51,7 +75,8 @@ echo ""
 log_info "Experiment: $EXPERIMENT_ID"
 log_info "Template: $TEMPLATE_NAME"
 log_info "Branch: $EXPERIMENT_BRANCH"
-log_info "Directory: experiments/${EXPERIMENT_ID}"
+log_info "Max iterations: $MAX_ITERATIONS"
+log_info "Auto PR: $AUTO_PR"
 echo ""
 
 cd "$DOTCLAUDE_ROOT"
@@ -66,36 +91,23 @@ git pull origin main
 log_step "2. Creating experiment branch..."
 git checkout -b "$EXPERIMENT_BRANCH"
 
-# Create experiment workspace directory
-mkdir -p "$EXPERIMENT_DIR"
+# Create experiment workspace (no nested git - just a subdirectory)
 mkdir -p "$EXPERIMENT_DIR/sessions"
 mkdir -p "$EXPERIMENT_DIR/project"
 
 # Copy template
 cp "$TEMPLATE_FILE" "$EXPERIMENT_DIR/template.md"
 
-# Create experiment project directory (this is where Claude builds the test project)
+# Extract stack info from template
+STACK=$(grep -A5 "## Stack" "$TEMPLATE_FILE" | grep "language" | sed 's/.*"language": *"\([^"]*\)".*/\1/' || echo "unknown")
+log_info "Detected stack: $STACK"
+
 PROJECT_DIR="$EXPERIMENT_DIR/project"
 cd "$PROJECT_DIR"
 
-# Initialize as a nested git repo for isolation (optional, can be .gitignore'd)
-# Or just work directly - let's keep it simple and work in the project dir
-
-# Initialize git in project dir
-git init
-git config user.email "experiment@dotclaude.local"
-git config user.name "Experiment Runner"
-echo "node_modules/" > .gitignore
-git add .gitignore
-git commit -m "Initial experiment project"
-
-# Initialize beads with sync branch
+# Initialize beads for the experiment project
 log_step "3. Setting up beads..."
-bd init --branch beads-sync 2>/dev/null || {
-    bd init
-    bd config set sync.branch beads-sync 2>/dev/null || true
-}
-bd hooks install 2>/dev/null || log_warn "Could not install beads hooks"
+bd init 2>/dev/null || log_warn "Beads init failed (may already exist)"
 
 # Seed beads from template
 log_info "Seeding beads from template..."
@@ -103,13 +115,27 @@ grep "^bd create" "$EXPERIMENT_DIR/template.md" | while read -r cmd; do
     log_info "  $cmd"
     eval "$cmd" 2>/dev/null || true
 done
-bd sync 2>/dev/null || true
 
 log_info "Beads ready:"
-bd ready || echo "(no ready tasks)"
+bd ready 2>/dev/null || echo "(no ready tasks)"
 
 # Save initial state
-bd list > "$EXPERIMENT_DIR/beads-initial.txt" 2>/dev/null || true
+bd list > "$EXPERIMENT_DIR/beads-initial.txt" 2>/dev/null || echo "No beads" > "$EXPERIMENT_DIR/beads-initial.txt"
+
+# Track success criteria
+SUCCESS_CRITERIA="$EXPERIMENT_DIR/success-criteria.json"
+cat > "$SUCCESS_CRITERIA" << 'EOF'
+{
+  "init_project_ran": false,
+  "next_feature_ran": false,
+  "review_loop_executed": false,
+  "tests_written": false,
+  "all_beads_completed": false,
+  "build_passes": false,
+  "tests_pass": false,
+  "errors": []
+}
+EOF
 
 #
 # Phase 1: Run /init-project
@@ -118,229 +144,344 @@ log_step "4. Running /init-project..."
 SESSION_FILE="$EXPERIMENT_DIR/sessions/01-init-project.json"
 
 cd "$PROJECT_DIR"
-claude --print "/init-project typescript" \
+
+# Extract project spec from template to guide init-project
+PROJECT_SPEC=$(sed -n '/## Project Spec/,/## Pre-seeded Beads/p' "$EXPERIMENT_DIR/template.md" | head -n -1)
+
+claude --print "/init-project $STACK
+
+This is an EXISTING PROJECT being documented. Use existing_project mode.
+Skip the brainstorming interview - use the project spec below.
+
+## Project Spec
+$PROJECT_SPEC
+
+Create CLAUDE.md based on this spec, inline the appropriate rules, and set up beads." \
     --dangerously-skip-permissions \
     --output-format json \
     > "$SESSION_FILE" 2>&1 || log_warn "init-project session ended"
 
+# Check if init succeeded
+if [[ -f "CLAUDE.md" ]]; then
+    log_success "init-project created CLAUDE.md"
+    # Update success criteria
+    sed -i 's/"init_project_ran": false/"init_project_ran": true/' "$SUCCESS_CRITERIA"
+else
+    log_warn "CLAUDE.md not created"
+    echo "init-project failed to create CLAUDE.md" >> "$EXPERIMENT_DIR/errors.txt"
+fi
+
+# Commit progress to experiment branch
+cd "$DOTCLAUDE_ROOT"
 git add -A
-git commit -m "After init-project" --allow-empty
+git commit -m "Experiment $EXPERIMENT_ID: after init-project" --allow-empty
 
 #
-# Phase 2: Work loop
+# Phase 2: Work loop - complete beads tasks
 #
-log_step "5. Starting autonomous work loop..."
+log_step "5. Starting work loop (max $MAX_ITERATIONS iterations)..."
 SESSION_NUM=2
-MAX_ITERATIONS=20
+FEATURES_COMPLETED=0
 
-while [[ $SESSION_NUM -le $MAX_ITERATIONS ]]; do
+while [[ $SESSION_NUM -le $((MAX_ITERATIONS + 1)) ]]; do
     cd "$PROJECT_DIR"
 
-    READY_COUNT=$(bd ready 2>/dev/null | grep -c "^[0-9]" || echo "0")
+    READY_COUNT=$(bd ready 2>/dev/null | grep -c "^\[" || echo "0")
 
     if [[ "$READY_COUNT" -eq 0 ]]; then
-        log_info "All beads completed!"
+        log_success "All beads completed!"
+        sed -i 's/"all_beads_completed": false/"all_beads_completed": true/' "$SUCCESS_CRITERIA"
         break
     fi
 
-    log_info "Iteration $SESSION_NUM: $READY_COUNT beads remaining"
+    if [[ $SESSION_NUM -gt $MAX_ITERATIONS ]]; then
+        log_warn "Hit max iterations ($MAX_ITERATIONS). $READY_COUNT beads remaining."
+        break
+    fi
+
+    log_info "Iteration $((SESSION_NUM - 1))/$MAX_ITERATIONS: $READY_COUNT beads remaining"
 
     SESSION_FILE="$EXPERIMENT_DIR/sessions/$(printf '%02d' $SESSION_NUM)-next-feature.json"
 
     claude --print "/next-feature
 
-Complete this task fully. After implementation:
-1. Run bd sync
-2. Commit all changes
-3. Report what was accomplished" \
+Complete ONE task from the beads list. Follow the full workflow:
+1. Pick a ready task
+2. Implement it following CLAUDE.md conventions
+3. Write tests at boundary level (API endpoints, etc.)
+4. Run the review loop until clean
+5. Close the bead with bd close
+
+After completion, run bd sync and report what was accomplished." \
         --dangerously-skip-permissions \
         --output-format json \
         > "$SESSION_FILE" 2>&1 || log_warn "Session ended"
 
-    # Landing protocol
-    bd sync 2>/dev/null || true
-    git add -A
-    git commit -m "After iteration $SESSION_NUM" --allow-empty
+    # Check for evidence of success
+    if grep -q "next-feature\|next_feature" "$SESSION_FILE" 2>/dev/null; then
+        sed -i 's/"next_feature_ran": false/"next_feature_ran": true/' "$SUCCESS_CRITERIA"
+    fi
 
-    bd list > "$EXPERIMENT_DIR/beads-after-$SESSION_NUM.txt" 2>/dev/null || true
+    if grep -q "review\|Review" "$SESSION_FILE" 2>/dev/null; then
+        sed -i 's/"review_loop_executed": false/"review_loop_executed": true/' "$SUCCESS_CRITERIA"
+    fi
+
+    # Sync beads
+    bd sync 2>/dev/null || true
+
+    # Save state
+    bd list > "$EXPERIMENT_DIR/beads-after-$((SESSION_NUM - 1)).txt" 2>/dev/null || true
+
+    # Commit progress
+    cd "$DOTCLAUDE_ROOT"
+    git add -A
+    git commit -m "Experiment $EXPERIMENT_ID: iteration $((SESSION_NUM - 1))" --allow-empty
 
     ((SESSION_NUM++))
+    ((FEATURES_COMPLETED++))
 done
 
+ITERATIONS_RUN=$((SESSION_NUM - 2))
+log_info "Completed $ITERATIONS_RUN iterations, $FEATURES_COMPLETED features"
+
 #
-# Phase 3: Analysis
+# Phase 3: Automated verification
 #
-log_step "6. Analyzing results..."
+log_step "6. Running automated verification..."
+
+cd "$PROJECT_DIR"
+
+# Check for test files
+TEST_FILES=$(find . -name "*.Tests.*" -o -name "*Test*.fs" -o -name "*Tests*.fs" -o -name "*.test.*" 2>/dev/null | head -20)
+if [[ -n "$TEST_FILES" ]]; then
+    log_success "Test files found"
+    sed -i 's/"tests_written": false/"tests_written": true/' "$SUCCESS_CRITERIA"
+    echo "$TEST_FILES" > "$EXPERIMENT_DIR/test-files.txt"
+else
+    log_warn "No test files found"
+fi
+
+# Try to build (F# specific)
+if [[ -f "*.fsproj" ]] || find . -name "*.fsproj" -type f | head -1 | grep -q .; then
+    log_info "Attempting dotnet build..."
+    if dotnet build 2>&1 | tee "$EXPERIMENT_DIR/build-output.txt"; then
+        log_success "Build passed"
+        sed -i 's/"build_passes": false/"build_passes": true/' "$SUCCESS_CRITERIA"
+    else
+        log_warn "Build failed"
+    fi
+
+    log_info "Attempting dotnet test..."
+    if dotnet test 2>&1 | tee "$EXPERIMENT_DIR/test-output.txt"; then
+        log_success "Tests passed"
+        sed -i 's/"tests_pass": false/"tests_pass": true/' "$SUCCESS_CRITERIA"
+    else
+        log_warn "Tests failed or no tests"
+    fi
+fi
+
+#
+# Phase 4: Analysis and feedback
+#
+log_step "7. Analyzing experiment results..."
 
 cd "$DOTCLAUDE_ROOT"
 
-# Collect all session outputs for analysis
-SESSIONS_CONTENT=""
+# Collect session summaries
+SESSIONS_SUMMARY=""
 for session in "$EXPERIMENT_DIR/sessions"/*.json; do
     if [[ -f "$session" ]]; then
-        SESSIONS_CONTENT="$SESSIONS_CONTENT
+        # Extract just key info, not full output
+        SESSIONS_SUMMARY="$SESSIONS_SUMMARY
 --- $(basename "$session") ---
-$(head -c 30000 "$session")"
+$(head -c 15000 "$session" | tail -c 10000)"
     fi
 done
 
-# Run analysis
-ANALYSIS_FILE="$EXPERIMENT_DIR/analysis.json"
+# Generate analysis
+ANALYSIS_FILE="$EXPERIMENT_DIR/analysis.md"
 
 claude --print "
-You are analyzing a Claude Code self-improvement experiment.
+# Experiment Analysis: $EXPERIMENT_ID
 
-## Experiment: $EXPERIMENT_ID
-
-## Template (Expected Behavior)
+## Template
 $(cat "$EXPERIMENT_DIR/template.md")
 
-## Session Outputs
-$SESSIONS_CONTENT
+## Success Criteria Results
+$(cat "$SUCCESS_CRITERIA")
 
-## Current Rules (to potentially improve)
-$(cat .claude/rules/patterns.md | head -100)
-$(cat .claude/rules/typescript/core.md | head -100)
+## Session Summaries (abbreviated)
+$SESSIONS_SUMMARY
 
-## Task
+## Build/Test Output
+Build: $(cat "$EXPERIMENT_DIR/build-output.txt" 2>/dev/null | tail -20 || echo "N/A")
+Tests: $(cat "$EXPERIMENT_DIR/test-output.txt" 2>/dev/null | tail -20 || echo "N/A")
 
-Analyze the experiment:
-1. Did Claude follow the conventions in our rules?
-2. What worked well?
-3. What conventions were missed or unclear?
-4. What rule improvements would help future runs?
+## Files Created
+$(find "$PROJECT_DIR" -type f -name "*.fs" -o -name "*.fsproj" -o -name "*.md" 2>/dev/null | head -30)
 
-Output as JSON:
-{
-  \"success\": true|false,
-  \"conventions_followed\": [\"...\"],
-  \"conventions_missed\": [{\"rule\": \"...\", \"issue\": \"...\"}],
-  \"rule_proposals\": [{
-    \"file\": \"rules/typescript/core.md\",
-    \"section\": \"...\",
-    \"change\": \"...\",
-    \"rationale\": \"...\"
-  }]
-}
-" --output-format json > "$ANALYSIS_FILE" 2>&1 || log_warn "Analysis ended"
+---
+
+# Analysis Task
+
+Provide a structured analysis:
+
+## 1. Success Criteria Evaluation
+For each criterion, state PASS/FAIL with evidence:
+- init-project ran successfully
+- next-feature workflow executed
+- Review loop was used
+- Tests written at boundary level
+- All beads completed
+- Build passes
+- Tests pass
+
+## 2. Convention Adherence
+Which dotclaude conventions were followed/missed?
+Reference specific files and line patterns.
+
+## 3. What Worked Well
+Patterns that succeeded.
+
+## 4. What Needs Improvement
+Specific issues encountered.
+
+## 5. Rule Improvement Proposals
+If conventions were unclear or missing, propose specific changes:
+- File: .claude/rules/dotnet/fsharp.md
+- Section: [which section]
+- Current: [what it says now]
+- Proposed: [what it should say]
+- Rationale: [why]
+
+## 6. Recommendations for Next Experiment
+What should we test next?
+" > "$ANALYSIS_FILE" 2>&1 || log_warn "Analysis generation ended"
 
 log_info "Analysis saved: $ANALYSIS_FILE"
 
 #
-# Phase 4: Apply learnings (if any)
-#
-log_step "7. Applying learnings to rules..."
-
-LEARNINGS_FILE="$EXPERIMENT_DIR/applied-learnings.md"
-
-claude --print "
-Based on this analysis, make targeted improvements to the dotclaude rules.
-
-## Analysis
-$(cat "$ANALYSIS_FILE")
-
-## Instructions
-
-1. Review the rule_proposals from the analysis
-2. For each valid proposal, use the Edit tool to update the rule file
-3. Keep changes minimal and targeted
-4. Document what you changed in a summary
-
-Only make changes that are clearly beneficial based on the experiment evidence.
-Do NOT make speculative changes.
-" --dangerously-skip-permissions \
-  --output-format json > "$LEARNINGS_FILE" 2>&1 || log_warn "Learnings session ended"
-
-# Commit any rule changes
-git add -A
-git diff --cached --quiet || git commit -m "Apply learnings from experiment $EXPERIMENT_ID"
-
-#
-# Phase 5: Summary and PR
+# Phase 5: Summary and commit
 #
 log_step "8. Generating summary..."
 
-# Generate summary
 SUMMARY_FILE="$EXPERIMENT_DIR/SUMMARY.md"
 cat > "$SUMMARY_FILE" << EOF
-# Experiment: $EXPERIMENT_ID
+# Experiment Summary: $EXPERIMENT_ID
 
-**Template:** $TEMPLATE_NAME
 **Date:** $(date)
-**Sessions:** $((SESSION_NUM - 1))
+**Template:** $TEMPLATE_NAME
+**Stack:** $STACK
+**Iterations:** $ITERATIONS_RUN / $MAX_ITERATIONS max
+**Features completed:** $FEATURES_COMPLETED
 
-## Results
+## Success Criteria
 
-$(cat "$ANALYSIS_FILE" 2>/dev/null | head -100 || echo "See analysis.json")
+\`\`\`json
+$(cat "$SUCCESS_CRITERIA")
+\`\`\`
 
-## Files Changed
+## Quick Assessment
+
+$(grep -E "^- |PASS|FAIL" "$ANALYSIS_FILE" 2>/dev/null | head -20 || echo "See analysis.md for details")
+
+## Files Changed in Experiment
 
 \`\`\`
-$(git diff main --stat)
+$(find "$PROJECT_DIR" -type f \( -name "*.fs" -o -name "*.fsproj" -o -name "*.md" \) 2>/dev/null | wc -l) source files
+$(find "$PROJECT_DIR" -type f -name "*Test*" 2>/dev/null | wc -l) test files
 \`\`\`
 
-## Rule Updates Applied
+## Next Steps
 
-$(git diff main -- .claude/rules/ 2>/dev/null || echo "No rule changes")
+1. Review analysis.md for detailed findings
+2. Check sessions/ for full session logs
+3. Review any rule proposals
+4. Merge or discard this experiment branch
+
+---
+
+*Generated by dotclaude self-improvement runner*
 EOF
 
-git add "$SUMMARY_FILE"
-git commit -m "Add experiment summary" --allow-empty
+# Final commit
+git add -A
+git commit -m "Experiment $EXPERIMENT_ID: analysis and summary" --allow-empty
 
-# Push the experiment branch
+# Push
 log_step "9. Pushing experiment branch..."
 git push -u origin "$EXPERIMENT_BRANCH"
 
 #
-# Phase 6: Create PR (if requested)
+# Phase 6: Optional PR creation
 #
-if [[ "$AUTO_PR" == "--auto-pr" ]]; then
+if [[ "$AUTO_PR" == "true" ]]; then
     log_step "10. Creating Pull Request..."
 
-    PR_BODY=$(cat << EOF
-## Self-Improvement Experiment: $EXPERIMENT_ID
+    gh pr create \
+        --title "Experiment: $EXPERIMENT_ID" \
+        --body "$(cat << EOF
+## Self-Improvement Experiment
 
-This PR contains rule improvements discovered through automated experimentation.
+**Template:** \`$TEMPLATE_NAME\`
+**Iterations:** $ITERATIONS_RUN
+**Stack:** $STACK
 
-### What was tested
-- Template: \`$TEMPLATE_NAME\`
-- Task: Build a project following dotclaude conventions
-- Sessions: $((SESSION_NUM - 1))
+### Success Criteria
+\`\`\`json
+$(cat "$SUCCESS_CRITERIA")
+\`\`\`
 
-### Changes
-$(git diff main --stat)
+### Summary
+See \`experiments/$EXPERIMENT_ID/SUMMARY.md\` for full details.
 
-### How to review
-1. Check the \`experiments/$EXPERIMENT_ID/\` directory for full session logs
-2. Review rule changes in \`.claude/rules/\`
-3. Verify changes make sense based on the analysis
+### Review Checklist
+- [ ] Check success criteria results
+- [ ] Review analysis.md findings
+- [ ] Evaluate any rule proposals
+- [ ] Verify no unintended changes
 
 ---
-*Generated by dotclaude self-improvement runner*
+*Generated by /self-improve*
 EOF
-)
-
-    gh pr create \
-        --title "Self-improvement: $EXPERIMENT_ID" \
-        --body "$PR_BODY" \
+)" \
         --base main \
-        --head "$EXPERIMENT_BRANCH" || log_warn "Could not create PR (gh CLI may not be configured)"
-else
-    log_info "Experiment branch pushed. Create PR manually:"
-    echo "  gh pr create --base main --head $EXPERIMENT_BRANCH"
+        --head "$EXPERIMENT_BRANCH" || log_warn "Could not create PR"
 fi
 
+#
+# Final report
+#
 echo ""
 echo "============================================"
 echo "EXPERIMENT COMPLETE"
 echo "============================================"
 echo ""
 log_info "Branch: $EXPERIMENT_BRANCH"
-log_info "Results: experiments/$EXPERIMENT_ID/"
-log_info "Analysis: experiments/$EXPERIMENT_ID/analysis.json"
+log_info "Directory: experiments/$EXPERIMENT_ID/"
 echo ""
-log_info "To create a PR:"
-echo "  gh pr create --base main --head $EXPERIMENT_BRANCH"
+echo "Key files:"
+echo "  - SUMMARY.md      Quick overview"
+echo "  - analysis.md     Detailed analysis"
+echo "  - success-criteria.json"
+echo "  - sessions/       Full session logs"
 echo ""
-log_info "To discard experiment:"
+
+# Print success criteria
+echo "Success Criteria:"
+cat "$SUCCESS_CRITERIA" | grep -E '"[a-z_]+":' | while read line; do
+    if echo "$line" | grep -q "true"; then
+        echo -e "  ${GREEN}✓${NC} $(echo "$line" | sed 's/[",:]//g')"
+    else
+        echo -e "  ${RED}✗${NC} $(echo "$line" | sed 's/[",:]//g')"
+    fi
+done
+
+echo ""
+if [[ "$AUTO_PR" != "true" ]]; then
+    log_info "To create a PR:"
+    echo "  gh pr create --base main --head $EXPERIMENT_BRANCH"
+fi
+echo ""
+log_info "To discard:"
 echo "  git checkout main && git branch -D $EXPERIMENT_BRANCH"
