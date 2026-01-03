@@ -1,7 +1,6 @@
 ---
 name: write-human
 description: Write documentation, PR reviews, spikes, or summaries in British English without AI tells. Use when user says "write", "document", "summarise", "review this PR", "spike", "explain", or asks for any written content.
-user_invocable: true
 arguments:
   - name: mode
     description: Type of content - docs, pr-review, spike, email, general (auto-detected if not specified)
