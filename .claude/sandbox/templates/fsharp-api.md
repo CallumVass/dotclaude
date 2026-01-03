@@ -43,6 +43,11 @@ dotnet build        # Build
 - Reading of startedAt: DateTimeOffset
 - Finished of finishedAt: DateTimeOffset
 
+**API Endpoints:**
+- GET /books - List all books
+- POST /books - Add a new book
+- PUT /books/:id/status - Update reading status
+
 **Architecture:**
 - Domain.fs: Types, branded IDs, DUs
 - Services.fs: Business logic with Result types
@@ -56,25 +61,41 @@ dotnet build        # Build
 - Railway-oriented programming with Result.bind
 - No exceptions for expected errors
 
-## Pre-seeded Beads
+## Decisions (Use These When Asked)
 
-```bash
-bd create --title="Set up F# Minimal API project structure" --type=task --priority=1
-bd create --title="Define domain types (Book, BookId, ReadingStatus)" --type=task --priority=1
-bd create --title="Implement in-memory book repository" --type=task --priority=2
-bd create --title="Add GET /books endpoint" --type=task --priority=2
-bd create --title="Add POST /books endpoint" --type=task --priority=2
-bd create --title="Add PUT /books/:id/status endpoint" --type=task --priority=2
-bd create --title="Add API integration tests" --type=task --priority=3
-```
+If asked about any of these, use the provided answer:
+
+| Question | Answer |
+|----------|--------|
+| Authentication? | None - out of scope for this API |
+| Database? | In-memory storage (simple dict/map) |
+| Validation library? | Manual validation with Result type |
+| Architecture approach? | Pick the **pragmatic** option |
+| Project structure? | Single project + test project |
+| Logging? | Basic console logging only |
+| Error format? | JSON with error code and message |
+| API versioning? | Not needed for MVP |
+
+## Expected Scope
+
+Init-project should identify approximately these tasks:
+1. Project setup (F# minimal API scaffolding)
+2. Domain types (Book, BookId, ReadingStatus)
+3. In-memory repository
+4. GET endpoint
+5. POST endpoint
+6. PUT status endpoint
+7. Integration tests
+
+The exact breakdown may vary - let init-project determine the natural task structure.
 
 ## Success Criteria
 
 - [ ] Project builds with `dotnet build`
-- [ ] All 7 beads completed
 - [ ] Tests pass with `dotnet test`
 - [ ] API endpoints return correct responses
 - [ ] No compiler warnings
+- [ ] Beads created and completed through workflow
 
 ## Convention Checks
 
@@ -116,18 +137,4 @@ After completion, verify F# conventions:
   "framework": "aspnetcore-minimal",
   "testing": "xunit"
 }
-```
-
-## Expected File Structure
-
-```
-ReadingList/
-├── ReadingList.fsproj
-├── Domain.fs           # Types, branded IDs, DUs
-├── Services.fs         # Business logic
-├── Handlers.fs         # HTTP handlers
-├── Program.fs          # App entry point
-└── ReadingList.Tests/
-    ├── ReadingList.Tests.fsproj
-    └── ApiTests.fs     # Integration tests
 ```

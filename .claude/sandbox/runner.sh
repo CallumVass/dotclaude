@@ -105,22 +105,9 @@ log_info "Detected stack: $STACK"
 PROJECT_DIR="$EXPERIMENT_DIR/project"
 cd "$PROJECT_DIR"
 
-# Initialize beads for the experiment project
-log_step "3. Setting up beads..."
-bd init 2>/dev/null || log_warn "Beads init failed (may already exist)"
-
-# Seed beads from template
-log_info "Seeding beads from template..."
-grep "^bd create" "$EXPERIMENT_DIR/template.md" | while read -r cmd; do
-    log_info "  $cmd"
-    eval "$cmd" 2>/dev/null || true
-done
-
-log_info "Beads ready:"
-bd ready 2>/dev/null || echo "(no ready tasks)"
-
-# Save initial state
-bd list > "$EXPERIMENT_DIR/beads-initial.txt" 2>/dev/null || echo "No beads" > "$EXPERIMENT_DIR/beads-initial.txt"
+# Note: Beads will be initialized and created by init-project, not pre-seeded
+log_step "3. Preparing for init-project..."
+log_info "Beads will be created by init-project based on the project spec"
 
 # Track success criteria
 SUCCESS_CRITERIA="$EXPERIMENT_DIR/success-criteria.json"
@@ -145,31 +132,37 @@ SESSION_FILE="$EXPERIMENT_DIR/sessions/01-init-project.json"
 
 cd "$PROJECT_DIR"
 
-# Extract project spec from template to guide init-project
-PROJECT_SPEC=$(sed -n '/## Project Spec/,/## Pre-seeded Beads/p' "$EXPERIMENT_DIR/template.md" | head -n -1)
+# Extract project spec and decisions from template
+PROJECT_SPEC=$(sed -n '/## Project Spec/,/## Expected Scope/p' "$EXPERIMENT_DIR/template.md")
+DECISIONS=$(sed -n '/## Decisions/,/## Expected Scope/p' "$EXPERIMENT_DIR/template.md")
 
 claude --print "
-## AUTONOMOUS MODE - NO USER INPUT AVAILABLE
+## AUTONOMOUS MODE - ORCHESTRATOR PROVIDES ANSWERS
 
-You are running in a fully autonomous experiment. There is NO human to answer questions.
-DO NOT use AskUserQuestion. DO NOT wait for input. Make reasonable decisions and proceed.
+You are running in an autonomous experiment. When you need to make decisions or would
+normally ask questions, consult the DECISIONS section below for pre-made answers.
+
+If a question isn't covered, make the pragmatic choice and document your reasoning.
 
 ---
 
 /init-project $STACK
 
-This is an EXISTING PROJECT being documented. Use existing_project mode.
-Skip the brainstorming interview entirely - all information is in the project spec below.
+This is a NEW PROJECT. Run the full init-project workflow:
+1. Use the project spec below (no need to brainstorm - spec is complete)
+2. Create CLAUDE.md with inlined rules for the stack
+3. Initialize beads and create tasks based on the Expected Scope
+4. When you would ask a question, check DECISIONS first
 
-## Project Spec
 $PROJECT_SPEC
 
-## Instructions
-1. Create CLAUDE.md based on this spec
-2. Inline the appropriate rules for the stack
-3. Initialize beads
-4. DO NOT ask any questions - all info is provided above
-5. If you need to make a decision, choose the pragmatic option and document it" \
+$DECISIONS
+
+## Expected Behavior
+- Create CLAUDE.md with project info and inlined $STACK rules
+- Initialize beads (bd init, bd setup claude --project)
+- Create beads tasks for the features described in the spec
+- The spec is detailed enough - proceed without asking clarifying questions" \
     --dangerously-skip-permissions \
     --output-format json \
     > "$SESSION_FILE" 2>&1 || log_warn "init-project session ended"
@@ -177,12 +170,16 @@ $PROJECT_SPEC
 # Check if init succeeded
 if [[ -f "CLAUDE.md" ]]; then
     log_success "init-project created CLAUDE.md"
-    # Update success criteria
     sed -i 's/"init_project_ran": false/"init_project_ran": true/' "$SUCCESS_CRITERIA"
 else
     log_warn "CLAUDE.md not created"
     echo "init-project failed to create CLAUDE.md" >> "$EXPERIMENT_DIR/errors.txt"
 fi
+
+# Save beads state after init-project
+bd list > "$EXPERIMENT_DIR/beads-after-init.txt" 2>/dev/null || echo "No beads created" > "$EXPERIMENT_DIR/beads-after-init.txt"
+INIT_BEADS=$(bd ready 2>/dev/null | grep -c "project-" || echo "0")
+log_info "Beads created by init-project: $INIT_BEADS"
 
 # Commit progress to experiment branch
 cd "$DOTCLAUDE_ROOT"
@@ -218,32 +215,30 @@ while [[ $SESSION_NUM -le $((MAX_ITERATIONS + 1)) ]]; do
     SESSION_FILE="$EXPERIMENT_DIR/sessions/$(printf '%02d' $SESSION_NUM)-next-feature.json"
 
     claude --print "
-## AUTONOMOUS MODE - NO USER INPUT AVAILABLE
+## AUTONOMOUS MODE - ORCHESTRATOR PROVIDES ANSWERS
 
-You are running in a fully autonomous experiment. There is NO human to answer questions.
-DO NOT use AskUserQuestion. DO NOT wait for confirmations. Make reasonable decisions and proceed.
+When you need to make decisions, check the DECISIONS section below first.
+If not covered, pick the pragmatic option.
 
-When choosing between approaches:
-- Pick the PRAGMATIC option (not minimal, not over-engineered)
-- Document your choice briefly
-- Move forward without asking
+$DECISIONS
 
 ---
 
-/next-feature
+Let's work on the next feature. Use your /next-feature skill.
 
-Complete ONE task from the beads list. Follow the full workflow:
-1. Pick the highest priority ready task
-2. Implement it following CLAUDE.md conventions
-3. Write tests at boundary level (API endpoints, etc.)
-4. Run the review loop - fix issues without asking, dismiss false positives
-5. Close the bead with bd close
+Complete ONE task fully:
+- Pick a ready task from beads
+- Implement following CLAUDE.md conventions
+- Write tests at boundary level (API endpoints)
+- Run review loop until clean
+- Close the bead when done
+- Run bd sync
 
-IMPORTANT:
-- In Phase 3 (Clarification): Make reasonable assumptions, don't ask
-- In Phase 4 (Architecture): Pick the pragmatic approach automatically
-- In Phase 7 (Review): Fix valid issues, dismiss false positives without asking
-- After completion: Run bd sync and report what was accomplished" \
+For decisions: check DECISIONS above, or pick pragmatic option.
+For architecture: pick option 2 or 3 (pragmatic).
+For review issues: fix real ones, dismiss false positives with brief reason.
+
+Report what you accomplished." \
         --dangerously-skip-permissions \
         --output-format json \
         > "$SESSION_FILE" 2>&1 || log_warn "Session ended"

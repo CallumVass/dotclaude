@@ -43,6 +43,12 @@ const STATUSES = ['pending', 'in_progress', 'done'] as const
 type TodoStatus = typeof STATUSES[number]
 ```
 
+**API Endpoints:**
+- GET /todos - List all todos
+- POST /todos - Create a todo
+- PUT /todos/:id - Update a todo
+- DELETE /todos/:id - Delete a todo
+
 **Architecture:**
 - types/: Type definitions, branded IDs
 - services/: Business logic with Result types
@@ -57,55 +63,61 @@ type TodoStatus = typeof STATUSES[number]
 - Tests at API boundary (supertest)
 - No any types
 
-## Pre-seeded Beads
+## Decisions (Use These When Asked)
 
-```bash
-bd create --title="Set up Express server with TypeScript" --type=task --priority=1
-bd create --title="Define domain types (Todo, TodoId, Result)" --type=task --priority=1
-bd create --title="Implement GET /todos endpoint" --type=task --priority=2
-bd create --title="Implement POST /todos endpoint" --type=task --priority=2
-bd create --title="Implement PUT /todos/:id endpoint" --type=task --priority=2
-bd create --title="Implement DELETE /todos/:id endpoint" --type=task --priority=2
-bd create --title="Add API integration tests" --type=task --priority=3
-```
+If asked about any of these, use the provided answer:
+
+| Question | Answer |
+|----------|--------|
+| Authentication? | None - out of scope |
+| Database? | In-memory Map |
+| Validation library? | Manual with Result type |
+| Architecture approach? | Pick **pragmatic** option |
+| Project structure? | src/ with types/, services/, routes/ |
+| Logging? | console.log only |
+| Error format? | JSON { success: false, error: string } |
+
+## Expected Scope
+
+Init-project should identify approximately these tasks:
+1. Project setup (Express + TypeScript)
+2. Type definitions (Todo, TodoId, Result)
+3. In-memory storage service
+4. GET /todos endpoint
+5. POST /todos endpoint
+6. PUT /todos/:id endpoint
+7. DELETE /todos/:id endpoint
+8. API integration tests
+
+The exact breakdown may vary.
 
 ## Success Criteria
 
 - [ ] Project builds with `npm run build`
-- [ ] All 7 beads completed
 - [ ] Tests pass with `npm test`
-- [ ] API endpoints return correct responses
+- [ ] API endpoints work correctly
 - [ ] No TypeScript errors
+- [ ] Beads created and completed
 
 ## Convention Checks
 
-After completion, verify TypeScript conventions:
-
-1. **Type Definitions (types/)**
-   - [ ] TodoId is branded type, not raw number
-   - [ ] Result<T, E> type defined and used
-   - [ ] Const assertions for status values
+1. **Type Definitions**
+   - [ ] TodoId is branded type
+   - [ ] Result<T, E> defined and used
+   - [ ] Const assertions for status
    - [ ] No `any` types
 
 2. **Services**
    - [ ] Functions return Result<T, E>
-   - [ ] Error handling without exceptions
-   - [ ] Pure functions where possible
+   - [ ] No thrown exceptions for expected errors
 
 3. **Route Handlers**
-   - [ ] Pattern matching on Result (if/switch)
-   - [ ] Appropriate HTTP status codes
+   - [ ] Proper HTTP status codes
    - [ ] Input validation
 
 4. **Testing**
    - [ ] Tests at API boundary (supertest)
    - [ ] @faker-js/faker for test data
-   - [ ] All CRUD operations tested
-
-5. **General TypeScript Style**
-   - [ ] Strict mode enabled
-   - [ ] No implicit any
-   - [ ] Prefer `type` for unions, `interface` for objects
 
 ## Stack
 
@@ -116,25 +128,4 @@ After completion, verify TypeScript conventions:
   "framework": "express",
   "testing": "vitest"
 }
-```
-
-## Expected File Structure
-
-```
-todo-api/
-├── package.json
-├── tsconfig.json
-├── src/
-│   ├── types/
-│   │   ├── index.ts      # Exports
-│   │   ├── todo.ts       # Todo, TodoId
-│   │   └── result.ts     # Result type
-│   ├── services/
-│   │   └── todoService.ts
-│   ├── routes/
-│   │   └── todos.ts
-│   ├── app.ts
-│   └── index.ts
-└── tests/
-    └── todos.test.ts     # API integration tests
 ```
