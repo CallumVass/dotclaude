@@ -1,2 +1,7 @@
 # Local Claude configuration
 CLAUDE.local.md
+
+# Experiment artifacts (exist only in experiment branches)
+experiments/*/project/node_modules/
+experiments/*/project/.beads/
+*.db
