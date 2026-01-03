@@ -1,235 +1,98 @@
 ---
 name: brainstorm
-description: Deep-dive interview for existing projects to plan the next phase of work. Reviews completed work, interviews about next steps, and creates beads. Use when user says "brainstorm", "what's next", "plan next phase", or wants to discuss future work.
-user_invocable: true
+description: Deep-dive interview to discover features, requirements, and edge cases. Use when starting a project, planning features, or user says "brainstorm", "spec", "interview me", "let's plan".
 arguments:
-  - name: focus
-    description: Optional focus area (e.g., "performance", "testing", "new feature")
+  - name: spec
+    description: Path to spec file (defaults to SPEC.md)
+    required: false
+  - name: create-issues
+    description: Create beads issues from spec when done (defaults to true if beads initialized)
     required: false
 ---
 
 # Brainstorm
 
-In-depth interview for existing projects to discover and plan the next phase of work.
-
----
-
-## When to Use
-
-- Project already has CLAUDE.md and beads set up
-- Some work has been completed
-- User wants to figure out what to work on next
-- Planning a new phase or feature area
-
----
+Interview the user to build a comprehensive spec, then optionally create beads issues.
 
 ## Constraints
 
-```
-REQUIRE existing_project:
-  - CLAUDE.md must exist
-  - Beads must be initialized
+- Ask non-obvious questions - assume user has thought about the basics
+- Go deep on technical implementation, UX, edge cases, tradeoffs
+- Continue until user signals completion
+- Never ask yes/no questions - ask open-ended or offer specific options
+- Challenge assumptions respectfully
 
-INVARIANT non_obvious_questions:
-  - Never ask questions with obvious answers
-  - Probe edge cases, tradeoffs, concerns
-  - Challenge assumptions
-  - Explore what could go wrong
+## Question Categories
 
-INVARIANT continuous_interview:
-  - Keep interviewing until user signals completion
-  - Don't stop after one round
-  - Build on previous answers
-  - Go deeper, not wider
-```
+Cycle through these, adapting to context:
 
----
+**Technical depth**
+- "How should X behave when Y fails?"
+- "What's the recovery path if Z gets corrupted?"
+- "Where does this data live and who owns it?"
 
-## Phases
+**UX and interaction**
+- "What does the user see while waiting for X?"
+- "How do they undo this action?"
+- "What happens on the second use vs first use?"
 
-### Phase 1: Context Gathering
+**Edge cases**
+- "What if there are 10,000 of these?"
+- "What if the user is offline?"
+- "What if two users do this simultaneously?"
 
-```
-INPUTS: CLAUDE.md, beads state
-OUTPUTS: project_context, completed_work[], open_work[]
+**Tradeoffs**
+- "Speed vs correctness - where do you lean here?"
+- "Do we build X now or defer it?"
+- "What's the MVP vs the ideal?"
 
-READ CLAUDE.md to understand:
-  - Project vision and goals
-  - Tech stack and architecture
-  - Conventions in use
+**Concerns**
+- "What keeps you up at night about this?"
+- "What's the riskiest assumption?"
+- "Where might we be wrong?"
 
-RUN beads commands:
-  - bd list --status=closed → completed_work[]
-  - bd list --status=open → open_work[]
-  - bd ready → ready_work[]
+## Process
 
-SUMMARIZE to user:
-  "## Current State
+1. Gather context (in order of preference):
 
-  **Completed:** [count] tasks
-  [list key completed items]
+   **If spec file exists:**
+   - Read it, use as foundation for interview
+   - Goal: go deeper, find gaps, challenge assumptions
 
-  **Open:** [count] tasks
-  [list open items]
+   **Else if beads initialized (`bd version` succeeds):**
+   - Run `bd list --json` to get existing issues
+   - Read epics and tasks to understand project scope
+   - Summarise understanding to user: "Based on your issues, this looks like X. Is that right?"
+   - Goal: expand scope, discover new features, refine existing
 
-  **Ready to work on:** [count] tasks
+   **Else (greenfield):**
+   - Ask user: "What are you looking to build?"
+   - Get high-level description before diving deep
+   - Goal: shape the vision, then drill into details
 
-  Let's discuss what's next."
-```
+2. Interview loop:
+   - Ask 1-2 probing questions per round using AskUserQuestion
+   - Listen to answers, note gaps and assumptions
+   - Go deeper on vague areas
+   - Track decisions made
+   - Continue until user says "done", "that's it", or similar
 
-### Phase 2: Deep Interview
+3. Write spec:
+   - Update/create spec file with everything learned
+   - Structure: Overview, Requirements, Technical Design, Open Questions
+   - Be concrete - include decisions made, not just questions asked
 
-```
-STYLE:
-  - Use AskUserQuestion for structured choices where applicable
-  - Ask non-obvious questions that probe edge cases
-  - Explore tradeoffs, not just features
-  - Challenge assumptions
-  - Follow up where answers are thin
-  - Drive interview to completion - don't wait for user to end it
-  - When you have enough info, say so and move to synthesis
+4. If beads is initialized (`bd version` succeeds) and create-issues not disabled:
+   - Ask user if they want to create issues from the spec
+   - If yes, create epic + tasks using `bd create`
+   - Link tasks to epic
 
-INTERVIEW ROUNDS (adapt based on project state):
+5. Summarise what was captured and next steps.
 
-  Round 1 - Reflection on Completed Work:
-    - What worked well in what you've built?
-    - What would you do differently if starting over?
-    - Any technical debt that's bothering you?
-    - Anything that felt harder than it should be?
+## Interview Style
 
-  Round 2 - Next Priority:
-    - What's the most valuable thing to build next?
-    - What's blocking you from shipping to users?
-    - What would make the biggest difference to UX?
-    - Is there something you've been avoiding?
-
-  Round 3 - Technical Concerns:
-    - Where are the performance bottlenecks likely to appear?
-    - What happens when this scales 10x? 100x?
-    - Where is error handling weakest?
-    - What's the testing gap?
-
-  Round 4 - Edge Cases & Risks:
-    - What's the worst thing a user could do?
-    - What data loss scenarios exist?
-    - What happens if external services fail?
-    - What's underspecified that will bite you later?
-
-  Round 5 - UX & Polish:
-    - Where is the UX confusing or clunky?
-    - What feedback are users missing?
-    - What would make power users happy?
-    - What's the mobile story?
-
-  Round 6 - Scope & Priorities:
-    - What can be cut or deferred?
-    - What's the MVP for the next phase?
-    - What's a nice-to-have vs must-have?
-    - What order should things be built?
-
-CONTINUE UNTIL:
-  - Sufficient detail gathered to define next phase
-  - No obvious gaps in scope/priorities/risks
-  - OR user signals early completion
-
-SIGNALS next phase is defined (Claude drives to this):
-  - Clear set of next features/tasks identified
-  - Priorities understood (what's P1 vs P2)
-  - Key technical decisions made
-  - Edge cases and risks acknowledged
-  - Scope is bounded (what's in/out)
-  - Dependencies identified
-
-DRIVE to completion:
-  - Don't wait for user to end the interview
-  - When signals are met, move to synthesis
-  - Say "I think I have enough to propose a plan - let me synthesize"
-```
-
-### Phase 3: Synthesize & Create Beads
-
-```
-PRECONDITION: Interview complete
-INPUTS: interview_answers, project_context
-OUTPUTS: new_beads[]
-
-SYNTHESIZE into task breakdown:
-  - Group related items into features
-  - Identify dependencies
-  - Estimate relative priority (P1/P2/P3)
-  - Note any open questions as question-type beads
-
-PRESENT proposed tasks:
-  "## Proposed Next Phase
-
-  ### Feature: [Name]
-  - [ ] Task 1 (P1)
-  - [ ] Task 2 (P2)
-
-  ### Feature: [Name]
-  - [ ] Task 1 (P1)
-
-  ### Open Questions
-  - [ ] Question to resolve later
-
-  Does this capture it? Any changes?"
-
-WAIT for user confirmation
-
-ON confirm:
-  FOR EACH feature:
-    CREATE: bd create "[Feature]" -t feature -p 1 --json
-    FOR EACH task:
-      CREATE: bd create "[Task]" -t task -p [1|2|3] --parent <feature-id> --json
-
-  FOR EACH question:
-    CREATE: bd create "[Question]" -t task -l question -p 3 --json
-
-RUN: bd sync
-
-REPORT:
-  "Created [X] features, [Y] tasks, [Z] questions.
-
-  Run `bd ready` to see what's ready to work on.
-  Run `/next-feature` to start implementing."
-```
-
----
-
-## Interview Tips
-
-```
-GOOD questions (non-obvious, probe depth):
-  - "You mentioned X - what happens if Y fails during that?"
-  - "How does this interact with [existing feature]?"
-  - "What's the failure mode you're most worried about?"
-  - "If you had to ship tomorrow, what would you cut?"
-
-BAD questions (obvious, surface-level):
-  - "What features do you want?"
-  - "What's the project about?"
-  - "Do you want tests?"
-  - "Should we use TypeScript?"
-
-FOLLOW-UP patterns:
-  - "You said X - can you elaborate on the edge cases?"
-  - "What about [related concern] - is that handled?"
-  - "Earlier you mentioned Y - does that conflict with this?"
-  - "What's the worst case scenario there?"
-```
-
----
-
-## Quick Reference
-
-```
-| Step | Action |
-|------|--------|
-| 1 | Read CLAUDE.md and beads state |
-| 2 | Summarize current state to user |
-| 3 | Interview (multiple rounds, non-obvious questions) |
-| 4 | Synthesize into task breakdown |
-| 5 | Get user confirmation |
-| 6 | Create beads |
-| 7 | Report and suggest next steps |
-```
+- Be curious, not interrogative
+- "Tell me more about..." not "Explain..."
+- Offer options when useful: "Would you lean toward A (simpler) or B (more flexible)?"
+- Acknowledge good answers briefly, then push deeper
+- If user is unsure, help them think through it rather than moving on
