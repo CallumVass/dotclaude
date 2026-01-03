@@ -199,7 +199,8 @@ FEATURES_COMPLETED=0
 while [[ $SESSION_NUM -le $((MAX_ITERATIONS + 1)) ]]; do
     cd "$PROJECT_DIR"
 
-    READY_COUNT=$(bd ready 2>/dev/null | grep -c "^\[" || echo "0")
+    # Count lines that look like bead entries (start with project ID like "project-xxx")
+    READY_COUNT=$(bd ready 2>/dev/null | grep -c "^[a-z]*-[a-z0-9]*" || echo "0")
 
     if [[ "$READY_COUNT" -eq 0 ]]; then
         log_success "All beads completed!"
