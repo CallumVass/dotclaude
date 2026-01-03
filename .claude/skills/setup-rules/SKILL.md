@@ -51,3 +51,22 @@ If `stack` argument provided, use that instead of auto-detection.
 5. Delete `.claude/rules/` directory.
 
 6. Report what was included and where it went.
+
+7. Surface any manual setup commands for detected stack:
+
+   **Elixir**:
+   ```
+   mix igniter.install claude
+   ```
+
+   **TypeScript** (if no node_modules):
+   ```
+   npm install
+   ```
+
+   **.NET** (if no obj/bin):
+   ```
+   dotnet restore
+   ```
+
+   Tell user: "You may want to run these commands to complete setup."
