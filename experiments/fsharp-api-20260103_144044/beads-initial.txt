@@ -1,0 +1,7 @@
+project-l7k [P1] [task] open - Define domain types (Book, BookId, ReadingStatus)
+project-0qj [P1] [task] open - Set up F# Minimal API project structure
+project-bj4 [P2] [task] open - Add PUT /books/:id/status endpoint
+project-drs [P2] [task] open - Add POST /books endpoint
+project-c72 [P2] [task] open - Add GET /books endpoint
+project-o6u [P2] [task] open - Implement in-memory book repository
+project-jb2 [P3] [task] open - Add API integration tests

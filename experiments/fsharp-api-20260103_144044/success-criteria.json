@@ -1,0 +1,10 @@
+{
+  "init_project_ran": false,
+  "next_feature_ran": false,
+  "review_loop_executed": false,
+  "tests_written": false,
+  "all_beads_completed": false,
+  "build_passes": false,
+  "tests_pass": false,
+  "errors": []
+}
