@@ -114,10 +114,12 @@ SUCCESS_CRITERIA="$EXPERIMENT_DIR/success-criteria.json"
 cat > "$SUCCESS_CRITERIA" << 'EOF'
 {
   "init_project_ran": false,
+  "beads_created_by_init": false,
   "next_feature_ran": false,
   "review_loop_executed": false,
   "tests_written": false,
   "all_beads_completed": false,
+  "adhoc_created_bead": false,
   "build_passes": false,
   "tests_pass": false,
   "errors": []
@@ -180,6 +182,13 @@ fi
 bd list > "$EXPERIMENT_DIR/beads-after-init.txt" 2>/dev/null || echo "No beads created" > "$EXPERIMENT_DIR/beads-after-init.txt"
 INIT_BEADS=$(bd ready 2>/dev/null | grep -c "project-" || echo "0")
 log_info "Beads created by init-project: $INIT_BEADS"
+
+if [[ "$INIT_BEADS" -gt 0 ]]; then
+    log_success "Init-project created $INIT_BEADS beads"
+    sed -i 's/"beads_created_by_init": false/"beads_created_by_init": true/' "$SUCCESS_CRITERIA"
+else
+    log_warn "Init-project did not create any beads"
+fi
 
 # Commit progress to experiment branch
 cd "$DOTCLAUDE_ROOT"
@@ -269,6 +278,50 @@ done
 
 ITERATIONS_RUN=$((SESSION_NUM - 2))
 log_info "Completed $ITERATIONS_RUN iterations, $FEATURES_COMPLETED features"
+
+#
+# Phase 2b: Test ad-hoc feature flow (Path B)
+#
+log_step "5b. Testing ad-hoc feature request..."
+
+cd "$PROJECT_DIR"
+BEADS_BEFORE_ADHOC=$(bd list 2>/dev/null | wc -l)
+
+SESSION_FILE="$EXPERIMENT_DIR/sessions/adhoc-feature.json"
+
+# Request an ad-hoc feature that wasn't in the original spec
+claude --print "
+## AUTONOMOUS MODE - ORCHESTRATOR PROVIDES ANSWERS
+
+$DECISIONS
+
+---
+
+Hey, I just thought of something - can you add a way to filter books by status?
+Like GET /books?status=reading should only return books with that status.
+
+Use your /next-feature skill to implement this.
+This is an ad-hoc request, not in the original beads.
+" \
+    --dangerously-skip-permissions \
+    --output-format json \
+    > "$SESSION_FILE" 2>&1 || log_warn "Ad-hoc session ended"
+
+# Check if a bead was created for this ad-hoc request
+BEADS_AFTER_ADHOC=$(bd list 2>/dev/null | wc -l)
+if [[ "$BEADS_AFTER_ADHOC" -gt "$BEADS_BEFORE_ADHOC" ]]; then
+    log_success "Ad-hoc feature created a bead (Path B worked)"
+    sed -i 's/"adhoc_created_bead": false/"adhoc_created_bead": true/' "$SUCCESS_CRITERIA"
+else
+    log_warn "Ad-hoc feature did not create a bead"
+fi
+
+bd sync 2>/dev/null || true
+bd list > "$EXPERIMENT_DIR/beads-after-adhoc.txt" 2>/dev/null || true
+
+cd "$DOTCLAUDE_ROOT"
+git add -A
+git commit -m "Experiment $EXPERIMENT_ID: ad-hoc feature test" --allow-empty
 
 #
 # Phase 3: Automated verification
