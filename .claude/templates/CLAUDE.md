@@ -28,6 +28,19 @@ The `next-feature` skill handles: picking up the issue, planning, implementation
 
 **No code changes without a tracking issue. No implementation without next-feature.**
 
+## Git & Beads Workflow
+
+**Protected branch pattern**: Beads uses a `beads-sync` branch for metadata, keeping main clean.
+
+**Branch per feature**: Never work directly on main. Create `feat/<name>` branches.
+
+**Landing the plane**: At session end, complete ALL steps:
+1. `bd sync` - exports/commits beads changes
+2. `git push` - changes aren't "done" until pushed
+3. Include bead IDs in commits: `feat: add login (bd-abc)`
+
+**Git hooks**: Beads hooks auto-sync on commit/push. Run `bd hooks install` if missing.
+
 ## Vision
 
 {{ONE_LINER}}

@@ -228,11 +228,23 @@ PRECONDITION: Phase 4 complete, beads_available = true
 SKIP WHEN: beads_available = false
 
 INPUTS: none
-OUTPUTS: beads initialized, hooks configured
+OUTPUTS: beads initialized, hooks configured, sync branch set
 
 RUN:
+  # Initialize with sync branch for protected branch workflow
+  bd init --branch beads-sync
+
+  # OR if --branch not supported:
   bd init
+  bd config set sync.branch beads-sync
+
+  # Set up Claude integration
   bd setup claude --project
+
+  # Install git hooks (required for proper sync)
+  bd hooks install
+
+  # Verify setup
   bd doctor
 
 IF bd doctor reports issues:
@@ -242,7 +254,13 @@ IF AGENTS.md created by beads:
   APPEND contents to CLAUDE.md under "## Beads Workflow"
   DELETE AGENTS.md
 
-DONE WHEN: bd doctor passes
+NOTE on sync branch workflow:
+  - Beads commits to beads-sync branch, not main
+  - This allows protected main branch
+  - bd sync handles the branch automatically
+  - Git hooks ensure changes are captured
+
+DONE WHEN: bd doctor passes, hooks installed
 ```
 
 ### Phase 6: Create Issue Hierarchy

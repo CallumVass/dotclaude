@@ -404,24 +404,42 @@ LOOP:
 DONE WHEN: reviewer returned "NO ISSUES FOUND"
 ```
 
-### Phase 8: Completion
+### Phase 8: Completion (Landing the Plane)
 
 ```
 PRECONDITION: Phase 7 returned clean
 INPUTS: selected_tasks[], files_changed[], test_files[], review_iterations
-OUTPUTS: feature complete, beads closed
+OUTPUTS: feature complete, beads closed, changes pushed
+
+╔═══════════════════════════════════════════════════════════════╗
+║  LANDING PROTOCOL - ALL STEPS MANDATORY                       ║
+║  The plane has NOT landed until git push completes.           ║
+║  Unpushed work breaks multi-agent coordination.               ║
+╚═══════════════════════════════════════════════════════════════╝
 
 STEPS:
   1. RUN tests (final verification):
      mix test / npm test / dotnet test
-     
+
      IF failures: FIX and return to Phase 7
-  
+
   2. CLOSE beads:
      FOR EACH task in selected_tasks:
        bd close <id> --reason "Implemented: [brief description]" --json
-  
-  3. SYNC: bd sync
+
+  3. LANDING SEQUENCE (do not stop until complete):
+     a. git pull --rebase origin <branch>
+        - Resolve .beads/issues.jsonl conflicts if needed
+     b. bd sync
+        - Exports pending changes
+        - Commits to beads sync branch
+        - Imports any updates
+     c. git add -A && git commit -m "feat: [description] (bd-<ids>)"
+        - Include bead IDs in commit message for bd doctor
+     d. git push -u origin <branch>
+        - THIS MUST COMPLETE - plane stays grounded otherwise
+     e. git status
+        - Verify "up to date with origin"
 
 PRESENT summary:
   "## Feature Complete
