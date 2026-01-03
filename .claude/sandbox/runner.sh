@@ -148,15 +148,28 @@ cd "$PROJECT_DIR"
 # Extract project spec from template to guide init-project
 PROJECT_SPEC=$(sed -n '/## Project Spec/,/## Pre-seeded Beads/p' "$EXPERIMENT_DIR/template.md" | head -n -1)
 
-claude --print "/init-project $STACK
+claude --print "
+## AUTONOMOUS MODE - NO USER INPUT AVAILABLE
+
+You are running in a fully autonomous experiment. There is NO human to answer questions.
+DO NOT use AskUserQuestion. DO NOT wait for input. Make reasonable decisions and proceed.
+
+---
+
+/init-project $STACK
 
 This is an EXISTING PROJECT being documented. Use existing_project mode.
-Skip the brainstorming interview - use the project spec below.
+Skip the brainstorming interview entirely - all information is in the project spec below.
 
 ## Project Spec
 $PROJECT_SPEC
 
-Create CLAUDE.md based on this spec, inline the appropriate rules, and set up beads." \
+## Instructions
+1. Create CLAUDE.md based on this spec
+2. Inline the appropriate rules for the stack
+3. Initialize beads
+4. DO NOT ask any questions - all info is provided above
+5. If you need to make a decision, choose the pragmatic option and document it" \
     --dangerously-skip-permissions \
     --output-format json \
     > "$SESSION_FILE" 2>&1 || log_warn "init-project session ended"
@@ -203,16 +216,33 @@ while [[ $SESSION_NUM -le $((MAX_ITERATIONS + 1)) ]]; do
 
     SESSION_FILE="$EXPERIMENT_DIR/sessions/$(printf '%02d' $SESSION_NUM)-next-feature.json"
 
-    claude --print "/next-feature
+    claude --print "
+## AUTONOMOUS MODE - NO USER INPUT AVAILABLE
+
+You are running in a fully autonomous experiment. There is NO human to answer questions.
+DO NOT use AskUserQuestion. DO NOT wait for confirmations. Make reasonable decisions and proceed.
+
+When choosing between approaches:
+- Pick the PRAGMATIC option (not minimal, not over-engineered)
+- Document your choice briefly
+- Move forward without asking
+
+---
+
+/next-feature
 
 Complete ONE task from the beads list. Follow the full workflow:
-1. Pick a ready task
+1. Pick the highest priority ready task
 2. Implement it following CLAUDE.md conventions
 3. Write tests at boundary level (API endpoints, etc.)
-4. Run the review loop until clean
+4. Run the review loop - fix issues without asking, dismiss false positives
 5. Close the bead with bd close
 
-After completion, run bd sync and report what was accomplished." \
+IMPORTANT:
+- In Phase 3 (Clarification): Make reasonable assumptions, don't ask
+- In Phase 4 (Architecture): Pick the pragmatic approach automatically
+- In Phase 7 (Review): Fix valid issues, dismiss false positives without asking
+- After completion: Run bd sync and report what was accomplished" \
         --dangerously-skip-permissions \
         --output-format json \
         > "$SESSION_FILE" 2>&1 || log_warn "Session ended"
