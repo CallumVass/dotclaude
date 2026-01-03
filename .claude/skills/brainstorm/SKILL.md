@@ -86,7 +86,8 @@ STYLE:
   - Explore tradeoffs, not just features
   - Challenge assumptions
   - Follow up where answers are thin
-  - Drive interview to completion - don't stop early
+  - Drive interview to completion - don't wait for user to end it
+  - When you have enough info, say so and move to synthesis
 
 INTERVIEW ROUNDS (adapt based on project state):
 
@@ -127,15 +128,22 @@ INTERVIEW ROUNDS (adapt based on project state):
     - What order should things be built?
 
 CONTINUE UNTIL:
-  - User signals they're done
-  - OR comprehensive next phase is defined
-  - OR user says "that's enough" / "let's stop"
+  - Sufficient detail gathered to define next phase
+  - No obvious gaps in scope/priorities/risks
+  - OR user signals early completion
 
-SIGNALS interview is complete:
+SIGNALS next phase is defined (Claude drives to this):
   - Clear set of next features/tasks identified
-  - Priorities understood
-  - Edge cases acknowledged
-  - User has no more to add
+  - Priorities understood (what's P1 vs P2)
+  - Key technical decisions made
+  - Edge cases and risks acknowledged
+  - Scope is bounded (what's in/out)
+  - Dependencies identified
+
+DRIVE to completion:
+  - Don't wait for user to end the interview
+  - When signals are met, move to synthesis
+  - Say "I think I have enough to propose a plan - let me synthesize"
 ```
 
 ### Phase 3: Synthesize & Create Beads
