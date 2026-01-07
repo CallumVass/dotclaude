@@ -72,6 +72,7 @@ Stack-specific coding standards in `.claude/rules/`:
 ```
 rules/
 ├── patterns.md           # Universal (DRY, YAGNI, testing)
+├── windows.md            # Windows-specific (nul redirection, paths)
 ├── dotnet/
 │   ├── core.md           # .NET conventions
 │   ├── csharp.md         # C# 12+ features

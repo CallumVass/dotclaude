@@ -86,6 +86,10 @@ Cycle through these, adapting to context:
    - Ask user if they want to create issues from the spec
    - If yes, create epic + tasks using `bd create`
    - Link tasks to epic
+   - **Tasks must be vertical slices** - each task includes its boundary and tests:
+     - "Add user profile page" = component + component test
+     - "Add profile API endpoint" = controller + request test
+     - Never separate "implement X" from "test X" - testing is part of done
 
 5. Summarise what was captured and next steps.
 

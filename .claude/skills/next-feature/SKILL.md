@@ -17,6 +17,7 @@ Pick a beads issue, understand the codebase, design the approach, implement, rev
 - Never implement without user approval on architecture (full path)
 - Always run `/review-loop` before marking complete
 - Commit with issue ID in message
+- **Boundary tests are mandatory** - task is not complete without them
 
 ## Process
 
@@ -114,7 +115,24 @@ Run `/review-loop`, then go to **Complete** below.
 
 ## Complete
 
-Both paths end here:
+Both paths end here.
+
+### Pre-completion gate
+
+Before marking done, verify boundary tests exist:
+
+| If you created... | You must have... |
+|-------------------|------------------|
+| Vue/React component | Component test (mount, interact, assert) |
+| LiveView | LiveViewTest with `live()` |
+| Controller/API endpoint | Request test (HTTP in, response out) |
+| CLI command | Integration test (invoke, check output) |
+
+**If boundary tests are missing, write them before proceeding.**
+
+Unit tests for internal helpers (composables, services, utils) do NOT satisfy this requirement - the test must exercise the boundary itself.
+
+### Finish
 
 ```
 bd status <issue-id> done

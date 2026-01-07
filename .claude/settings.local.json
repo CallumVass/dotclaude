@@ -8,11 +8,13 @@
       "Bash(dir:*)",
       "Bash(grep:*)",
       "Bash(bd:*)",
+      "Skill(next-feature)",
       "Skill(review-loop)",
       "Skill(write-human)",
       "WebSearch",
       "WebFetch(domain:github.com)",
-      "WebFetch(domain:raw.githubusercontent.com)"
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(findstr:*)"
     ]
   }
 }

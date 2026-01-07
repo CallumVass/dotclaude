@@ -16,6 +16,7 @@ Run code review in a loop until no issues remain.
 - Main agent must run this loop directly (plugin subagents can't spawn nested subagents)
 - Every issue must be either fixed or dismissed with a reason
 - Exit only when reviewer returns "NO ISSUES FOUND"
+- **Boundary tests are mandatory** - new UI/API code must have corresponding tests
 
 ## File Detection
 
@@ -38,7 +39,27 @@ If no files detected, inform user and exit.
    - Dismiss invalid issues with documented reason
    - Continue loop (fixes may introduce new issues)
 
-3. Report results:
+3. Check boundary tests:
+   - For each new/modified file, identify if it's a boundary (controller, page, component, API endpoint)
+   - If boundary code exists without corresponding test file, flag as issue
+   - Test must exercise the boundary, not internal collaborators
+
+   **What counts as a boundary test:**
+   | Code | Required Test |
+   |------|---------------|
+   | Vue component | Component test (mount, interact, assert) |
+   | React component | Component test with Testing Library |
+   | LiveView | LiveViewTest with `live()` |
+   | Controller/API | Request test (HTTP in, response out) |
+   | CLI command | Integration test (invoke, check output) |
+
+   **NOT boundary tests (don't count):**
+   - Unit tests for composables/hooks used by components
+   - Unit tests for services called by controllers
+   - Tests that mock the thing they're supposed to test
+
+4. Report results:
    - Number of iterations
    - Fixes made (what and where)
    - Issues dismissed (what and why)
+   - Missing boundary tests (if any)

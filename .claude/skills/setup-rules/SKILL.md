@@ -31,6 +31,7 @@ Scan project root for these indicators:
 | `package.json` or `tsconfig.json` | typescript/core.md |
 | `react` in package.json deps or `*.tsx` | + typescript/react.md |
 | `vue` in package.json deps or `*.vue` | + typescript/vue.md |
+| Windows platform | windows.md |
 | Always | patterns.md |
 
 If `stack` argument provided, use that instead of auto-detection.
