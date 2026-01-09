@@ -76,18 +76,18 @@ run_ralph_iteration() {
     log "${BLUE}========================================${NC}"
     log "${BLUE}Iteration $iteration of $MAX_ITERATIONS${NC}"
     log "${BLUE}========================================${NC}"
+    log "Running claude... (no real-time output - CLI limitation)"
+    log ""
 
-    # Run claude with ralph-task skill
-    # --permission-mode acceptEdits allows autonomous operation
-    # Run directly (not in -p mode) to see real-time output
-    # Use script to capture output while still showing it
-    script -q -c "claude --permission-mode acceptEdits -p '/ralph-task'" "$output_file"
+    # Run claude and capture output
+    # Note: Claude CLI doesn't support streaming text output when piped
+    claude --permission-mode acceptEdits -p '/ralph-task' > "$output_file" 2>&1
     local exit_code=$?
 
     local output
     output=$(cat "$output_file")
 
-    # Check for promise words
+    # Check for promise words in full output
     if [[ "$output" == *"$PROMISE_COMPLETE"* ]]; then
         log "${GREEN}Task completed successfully${NC}"
         rm -f "$output_file"
@@ -105,9 +105,9 @@ run_ralph_iteration() {
     else
         log "${RED}Unexpected output (no promise word found)${NC}"
         echo ""
-        echo "--- Last 50 lines ---"
+        echo "--- Last 50 lines of raw output ---"
         tail -50 "$output_file"
-        echo "---------------------"
+        echo "-----------------------------------"
         rm -f "$output_file"
         return 2
     fi
