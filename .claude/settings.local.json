@@ -11,6 +11,8 @@
       "Skill(next-feature)",
       "Skill(review-loop)",
       "Skill(write-human)",
+      "Skill(ralph-task)",
+      "Bash(gh:*)",
       "WebSearch",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:raw.githubusercontent.com)",

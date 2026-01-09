@@ -22,31 +22,36 @@ git clone https://github.com/CallumVass/dotclaude ~/.claude
 ### 2. Plan Features
 
 ```
-/brainstorm     # Deep discovery interview → spec → beads issues
+/brainstorm     # Deep discovery interview → spec → design system → issues
 ```
 
 Adapts to context:
 - Has spec file? Interviews to go deeper
 - Has beads issues? Reads them, expands scope
 - Greenfield? Asks what you're building
+- **UI apps?** Establishes design system (Tailwind/UnoCSS tokens, component patterns)
 
 ### 3. Build
 
+**Interactive mode:**
 ```
-/next-feature   # Full dev cycle: issue → branch → build → review → PR
+/next-feature   # Full dev cycle with human-in-the-loop
 ```
 
-Auto-detects complexity:
+Auto-detects complexity, asks clarifying questions, gets architecture approval.
 
-**Lite path** (small fixes, single file):
-- Pick issue → create branch → implement → review → PR
+**Autonomous mode (Ralph):**
+```bash
+# Unix/Mac
+./scripts/ralph.sh 10    # Max 10 iterations
 
-**Full path** (new features, multi-file):
-- Pick issue → create branch
-- Explore codebase (`code-explorer` agent)
-- Ask clarifying questions
-- Design architecture (`code-architect` agent)
-- Implement (with approval) → review → PR
+# Windows
+.\scripts\ralph.ps1 -MaxIterations 10 -Notify
+```
+
+Runs Claude in autonomous loop: pick issue → implement → test → PR → review → merge → repeat.
+
+See [Autonomous Workflow](#autonomous-workflow-ralph) for details.
 
 ### 4. Document
 
@@ -60,8 +65,9 @@ Auto-detects complexity:
 |-------|---------|
 | `/setup-rules` | Detect stack, consolidate `.claude/rules/` into `CLAUDE.md` |
 | `/setup-beads` | Initialize beads with protected branch workflow |
-| `/brainstorm` | Interview → spec → issues |
-| `/next-feature` | Pick issue → explore → architect → implement → review → done |
+| `/brainstorm` | Interview → spec → design system (UI apps) → issues |
+| `/next-feature` | Interactive: Pick issue → explore → architect → implement → review → done |
+| `/ralph-task` | Autonomous: Pick issue → implement → test → PR → review → merge |
 | `/review-loop` | Code review loop until clean |
 | `/write-human` | Human-sounding prose (British English) |
 
@@ -72,6 +78,7 @@ Stack-specific coding standards in `.claude/rules/`:
 ```
 rules/
 ├── patterns.md           # Universal (DRY, YAGNI, testing)
+├── frontend.md           # Tailwind/UnoCSS constraints, semantic tokens
 ├── windows.md            # Windows-specific (nul redirection, paths)
 ├── dotnet/
 │   ├── core.md           # .NET conventions
@@ -119,3 +126,107 @@ arguments:
 ```
 
 Keep skills lean - focus on constraints and intent, not pseudo-code.
+
+## Autonomous Workflow (Ralph)
+
+The Ralph workflow enables fully autonomous development - Claude picks up issues, implements them, and merges PRs without human intervention.
+
+### How It Works
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  ralph.sh / ralph.ps1 (external loop)                       │
+│                                                             │
+│  for i in 1..max_iterations:                                │
+│    result = claude /ralph-task                              │
+│    if COMPLETE → continue to next issue                     │
+│    if NO_ISSUES → exit (all done)                           │
+│    if BLOCKED → exit (human needed)                         │
+└─────────────────────────────────────────────────────────────┘
+```
+
+Each `/ralph-task` iteration:
+1. Picks next issue from `bd ready`
+2. Creates feature branch
+3. Explores codebase, implements feature
+4. Writes boundary tests
+5. Runs quality checks (lint, typecheck, test)
+6. Commits, pushes, creates PR
+7. Runs `/code-review` (up to 3 iterations)
+8. Auto-merges on success
+9. Outputs promise word for loop control
+
+### Running Ralph
+
+**Unix/Mac:**
+```bash
+# Make scripts executable (first time only)
+chmod +x scripts/ralph.sh scripts/quality-checks.sh
+
+# Run with max 10 iterations
+./scripts/ralph.sh 10
+
+# With notifications (set NOTIFY_CMD)
+NOTIFY_CMD="terminal-notifier -message" ./scripts/ralph.sh 10
+```
+
+**Windows:**
+```powershell
+# Run with max 10 iterations
+.\scripts\ralph.ps1 -MaxIterations 10
+
+# With toast notifications
+.\scripts\ralph.ps1 -MaxIterations 10 -Notify
+
+# Custom log file
+.\scripts\ralph.ps1 -MaxIterations 20 -LogFile "C:\logs\ralph.log"
+```
+
+### Creating Autonomous-Ready Issues
+
+Use `/brainstorm` to create properly-sized issues with:
+
+- **Clear acceptance criteria** - specific, testable conditions
+- **Implementation hints** - entry points, patterns to follow
+- **Test requirements** - what boundary tests are needed
+- **Right size** - completable in ~30-60 minutes
+
+Example good issue:
+```markdown
+## Summary
+Add avatar image upload to profile settings.
+
+## Acceptance Criteria
+- [ ] Upload button appears on /settings/profile
+- [ ] Accepts PNG, JPG, GIF under 2MB
+- [ ] Shows preview before save
+- [ ] Boundary tests cover component and API
+
+## Implementation Hints
+- Entry point: src/pages/settings/profile.vue
+- Pattern: src/pages/settings/notifications.vue
+```
+
+### Promise Words
+
+The loop script looks for these in Claude's output:
+
+| Promise Word | Meaning | Script Action |
+|--------------|---------|---------------|
+| `<promise>COMPLETE</promise>` | Task done, merged | Continue to next |
+| `<promise>NO_ISSUES</promise>` | No more issues | Exit success |
+| `<promise>BLOCKED</promise>` | Needs human | Exit with error |
+
+### When to Use
+
+**Good for:**
+- Well-defined tasks with clear acceptance criteria
+- Greenfield projects with good issue breakdown
+- Overnight/background development
+- Tasks with automatic verification (tests, linters)
+
+**Not good for:**
+- Tasks requiring design decisions or human judgement
+- Production debugging
+- Unclear or ambiguous requirements
+- One-shot operations

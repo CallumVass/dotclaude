@@ -82,7 +82,11 @@ Cycle through these, adapting to context:
    - Structure: Overview, Requirements, Technical Design, Open Questions
    - Be concrete - include decisions made, not just questions asked
 
-4. If beads is initialized (`bd version` succeeds) and create-issues not disabled:
+4. **If app has a UI** (React, Vue, Svelte, Next.js, dashboards, web apps, etc.):
+   - Establish design system BEFORE creating implementation issues
+   - See **Design System Phase** below
+
+5. If beads is initialized (`bd version` succeeds) and create-issues not disabled:
    - Ask user if they want to create issues from the spec
    - If yes, create epic + tasks using `bd create`
    - Link tasks to epic
@@ -90,8 +94,133 @@ Cycle through these, adapting to context:
      - "Add user profile page" = component + component test
      - "Add profile API endpoint" = controller + request test
      - Never separate "implement X" from "test X" - testing is part of done
+   - **For UI apps**: Create "Set up design system" as the FIRST issue
 
-5. Summarise what was captured and next steps.
+6. Summarise what was captured and next steps.
+
+---
+
+## Design System Phase (UI Apps)
+
+For apps with a frontend, establish the design system BEFORE implementation begins. This constrains all subsequent UI work to consistent, composable patterns.
+
+### When to Trigger
+
+Detect UI app via:
+- Framework mentions: React, Vue, Svelte, Next.js, Nuxt, Remix, etc.
+- UI-related requirements: "dashboard", "landing page", "admin panel", "component", etc.
+- User explicitly mentions frontend/UI work
+
+### Design Direction Questions
+
+Ask the user using AskUserQuestion:
+
+1. **Tone/personality**: What feel should this have?
+   - Precision & density (Linear, Raycast style)
+   - Warmth & approachability (Notion, Coda style)
+   - Sophistication & trust (Stripe, Mercury style)
+   - Bold & minimal (Vercel style)
+   - Utility & function (GitHub style)
+   - Dark & moody
+   - Playful & colourful
+
+2. **Palette preference**:
+   - Light mode, dark mode, or both?
+   - Primary brand colour (if any)?
+   - Warm, cool, or neutral foundation?
+
+3. **Inspiration**: Any reference sites or design systems to draw from?
+
+### Output: Design System Spec
+
+Add a **Design System** section to the spec file with:
+
+```markdown
+## Design System
+
+### Direction
+[Chosen aesthetic, e.g., "Precision & Density - Linear/Raycast inspired"]
+
+### Tailwind/UnoCSS Config Extensions
+
+\`\`\`js
+// tailwind.config.js or uno.config.ts theme.extend
+{
+  colors: {
+    // Semantic surface tokens
+    surface: {
+      DEFAULT: '#ffffff',
+      muted: '#f8fafc',
+      subtle: '#f1f5f9',
+    },
+    // Semantic border tokens
+    border: {
+      DEFAULT: 'rgba(0,0,0,0.08)',
+      subtle: 'rgba(0,0,0,0.05)',
+    },
+    // Semantic text tokens
+    foreground: {
+      DEFAULT: '#0f172a',
+      muted: '#64748b',
+      faint: '#94a3b8',
+    },
+    // Accent (adjust to brand)
+    accent: {
+      DEFAULT: '#3b82f6',
+      hover: '#2563eb',
+    },
+    // Status colours
+    success: '#22c55e',
+    warning: '#f59e0b',
+    error: '#ef4444',
+  },
+  fontFamily: {
+    sans: ['Geist', 'system-ui', 'sans-serif'],
+    mono: ['Geist Mono', 'monospace'],
+  },
+  fontSize: {
+    '2xs': '0.6875rem', // 11px
+    xs: '0.75rem',      // 12px
+    sm: '0.8125rem',    // 13px
+    base: '0.875rem',   // 14px
+  },
+  borderRadius: {
+    sm: '4px',
+    DEFAULT: '6px',
+    md: '8px',
+  },
+}
+\`\`\`
+
+### Component Patterns
+
+| Component | Classes | Notes |
+|-----------|---------|-------|
+| Card | \`bg-surface rounded border border-border p-4\` | |
+| Button (primary) | \`bg-accent text-white rounded px-4 py-2 hover:bg-accent-hover\` | |
+| Button (secondary) | \`bg-surface border border-border rounded px-4 py-2\` | |
+| Input | \`bg-surface border border-border rounded px-3 py-2 text-sm\` | |
+| Label | \`text-sm font-medium text-foreground-muted\` | |
+| Heading | \`text-lg font-semibold tracking-tight\` | |
+| Data/numbers | \`font-mono tabular-nums\` | |
+
+### Constraints
+
+- **Tailwind/UnoCSS only**: No inline styles, no CSS files, no \`style=\` attributes
+- **Semantic tokens**: Use \`text-foreground-muted\` not \`text-gray-500\`
+- **4px grid**: All spacing uses p-1 (4px), p-2 (8px), p-3 (12px), p-4 (16px)
+- **Component reuse**: Check patterns before creating new components
+```
+
+### First Beads Issue
+
+When creating issues, the FIRST issue for a UI app should be:
+
+```
+bd create "Set up design system" --description "Configure Tailwind/UnoCSS with semantic tokens, establish base component patterns per SPEC.md design system section"
+```
+
+This ensures the design system is implemented before any feature work begins.
 
 ## Interview Style
 
@@ -100,3 +229,114 @@ Cycle through these, adapting to context:
 - Offer options when useful: "Would you lean toward A (simpler) or B (more flexible)?"
 - Acknowledge good answers briefly, then push deeper
 - If user is unsure, help them think through it rather than moving on
+
+---
+
+## Autonomous-Ready Issues (Ralph Workflow)
+
+When creating issues destined for autonomous execution via `/ralph-task`, ensure they meet these criteria.
+
+### Size Guidelines
+
+Issues must be completable in a single Claude session (roughly 30-60 minutes of work):
+
+| Good Size | Too Large |
+|-----------|-----------|
+| Add single API endpoint with tests | Add entire CRUD API |
+| Create one component with tests | Build complete page with multiple components |
+| Fix specific bug with regression test | Refactor entire module |
+| Add single feature flag | Implement feature flagging system |
+
+**Rule of thumb**: If you can't describe the implementation in 3-5 bullet points, break it down further.
+
+### Issue Description Format
+
+When creating issues with `bd create`, use this structure:
+
+```markdown
+## Summary
+[One sentence describing what needs to be built]
+
+## Acceptance Criteria
+- [ ] [Specific, testable criterion]
+- [ ] [Specific, testable criterion]
+- [ ] [Boundary test added]
+
+## Implementation Hints
+- Entry point: [file path or pattern to start from]
+- Pattern to follow: [reference to similar existing feature]
+- Key files: [2-3 files likely to need changes]
+
+## Test Requirements
+| Boundary | Test Type |
+|----------|-----------|
+| [Component/Endpoint/View] | [Component test/Request test/LiveViewTest] |
+
+## Dependencies
+- Blocked by: [bd-xxx] (if any)
+- Blocks: [bd-yyy] (if any)
+```
+
+### Example: Good Autonomous Issue
+
+```
+bd create "Add user avatar upload to profile settings"
+```
+
+With description:
+
+```markdown
+## Summary
+Add avatar image upload functionality to the profile settings page.
+
+## Acceptance Criteria
+- [ ] Upload button appears on /settings/profile
+- [ ] Accepts PNG, JPG, GIF under 2MB
+- [ ] Shows preview before save
+- [ ] Saves to user record on submit
+- [ ] Shows error for invalid files
+- [ ] Boundary tests cover component and API
+
+## Implementation Hints
+- Entry point: src/pages/settings/profile.vue
+- Pattern to follow: src/pages/settings/notifications.vue (similar form)
+- Key files: src/api/users.ts, src/components/ImageUpload.vue (create)
+
+## Test Requirements
+| Boundary | Test Type |
+|----------|-----------|
+| ProfileSettings page | Component test with file upload mock |
+| PUT /api/users/:id/avatar | Request test |
+
+## Dependencies
+- Blocked by: none
+- Blocks: bd-c3d4 (avatar display in header)
+```
+
+### Example: Too Vague (Not Autonomous-Ready)
+
+```markdown
+## Summary
+Improve user profile functionality.
+
+## Notes
+Make the profile better. Users have complained.
+```
+
+This issue needs breaking down into specific, testable tasks.
+
+### Dependency Hierarchy
+
+For complex features, create an epic with ordered tasks:
+
+```bash
+# Create epic
+bd create "User Profile Improvements" --epic
+
+# Create tasks linked to epic
+bd create "Add avatar upload endpoint" --parent bd-epic-id
+bd create "Add avatar upload component" --parent bd-epic-id
+bd create "Add avatar display to header" --parent bd-epic-id
+```
+
+Tasks should be ordered so dependencies are completed first. The autonomous workflow will pick them up in order via `bd ready`.
