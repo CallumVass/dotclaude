@@ -12,9 +12,8 @@
 #
 # Environment variables:
 #   NOTIFY_CMD - Command to run for notifications (e.g., "terminal-notifier -message")
-#   LOG_FILE - Path to log file (default: ./ralph.log)
-#   TIMEOUT_MINUTES - Timeout per iteration in minutes (default: 30)
-#   MAX_TURNS - Max agentic turns per iteration (default: 50)
+#   LOG_FILE - Path to log file (default: ~/.claude/ralph.log)
+#   TIMEOUT_MINUTES - Timeout per iteration in minutes (default: 45)
 #
 
 set -euo pipefail
@@ -22,9 +21,8 @@ set -euo pipefail
 # Configuration
 MAX_ITERATIONS="${1:-10}"
 NOTIFY_CMD="${NOTIFY_CMD:-}"
-LOG_FILE="${LOG_FILE:-./ralph.log}"
-TIMEOUT_MINUTES="${TIMEOUT_MINUTES:-30}"  # Timeout per iteration
-MAX_TURNS="${MAX_TURNS:-50}"              # Max agentic turns per iteration
+LOG_FILE="${LOG_FILE:-$HOME/.claude/ralph.log}"
+TIMEOUT_MINUTES="${TIMEOUT_MINUTES:-45}"  # Timeout per iteration
 
 # Promise words
 PROMISE_COMPLETE="<promise>COMPLETE</promise>"
@@ -84,13 +82,12 @@ run_ralph_iteration() {
     log "${BLUE}========================================${NC}"
     log "${BLUE}Iteration $iteration of $MAX_ITERATIONS${NC}"
     log "${BLUE}========================================${NC}"
-    log "Running claude (timeout: ${TIMEOUT_MINUTES}m, max-turns: ${MAX_TURNS})..."
+    log "Running claude (timeout: ${TIMEOUT_MINUTES}m)..."
     log ""
 
     # Run claude with:
     # - timeout: prevent infinite hangs
     # - --dangerously-skip-permissions: no permission prompts
-    # - --max-turns: limit agentic loops
     # - --output-format stream-json --verbose: for streaming
     # - -p: non-interactive print mode
     #
@@ -98,7 +95,6 @@ run_ralph_iteration() {
     local exit_code=0
     timeout "${TIMEOUT_MINUTES}m" claude \
         --dangerously-skip-permissions \
-        --max-turns "$MAX_TURNS" \
         --output-format stream-json \
         --verbose \
         -p '/ralph-task' 2>&1 | tee "$output_file" | \
@@ -146,7 +142,6 @@ main() {
     log "${BLUE}==========================================${NC}"
     log "Max iterations: $MAX_ITERATIONS"
     log "Timeout per iteration: ${TIMEOUT_MINUTES}m"
-    log "Max turns per iteration: $MAX_TURNS"
     log "Log file: $LOG_FILE"
     log ""
 
