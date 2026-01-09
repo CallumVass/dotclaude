@@ -78,8 +78,9 @@ run_ralph_iteration() {
     log "${BLUE}========================================${NC}"
 
     # Run claude with ralph-task skill
-    # Using --print to capture output
-    if claude --print "/ralph-task" > "$output_file" 2>&1; then
+    # --permission-mode acceptEdits allows autonomous operation
+    # -p (--print) captures output for parsing
+    if claude --permission-mode acceptEdits -p "/ralph-task" > "$output_file" 2>&1; then
         local output
         output=$(cat "$output_file")
 

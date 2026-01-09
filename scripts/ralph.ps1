@@ -121,8 +121,9 @@ function Invoke-RalphIteration {
 
     try {
         # Run claude with ralph-task skill
+        # --permission-mode acceptEdits allows autonomous operation
         $process = Start-Process -FilePath "claude" `
-            -ArgumentList "--print", "/ralph-task" `
+            -ArgumentList "--permission-mode", "acceptEdits", "-p", "/ralph-task" `
             -RedirectStandardOutput $tempFile `
             -RedirectStandardError $tempErrFile `
             -Wait `
