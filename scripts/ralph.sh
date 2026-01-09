@@ -79,43 +79,35 @@ run_ralph_iteration() {
 
     # Run claude with ralph-task skill
     # --permission-mode acceptEdits allows autonomous operation
-    # -p (--print) captures output for parsing
-    # tee shows output in real-time while capturing for promise word check
-    if claude --permission-mode acceptEdits -p "/ralph-task" 2>&1 | tee "$output_file"; then
-        local output
-        output=$(cat "$output_file")
+    # Run directly (not in -p mode) to see real-time output
+    # Use script to capture output while still showing it
+    script -q -c "claude --permission-mode acceptEdits -p '/ralph-task'" "$output_file"
+    local exit_code=$?
 
-        # Check for promise words
-        if [[ "$output" == *"$PROMISE_COMPLETE"* ]]; then
-            log "${GREEN}Task completed successfully${NC}"
-            rm -f "$output_file"
-            return 0  # Continue loop
-        elif [[ "$output" == *"$PROMISE_NO_ISSUES"* ]]; then
-            log "${YELLOW}No more issues available${NC}"
-            notify "Ralph: All issues complete!"
-            rm -f "$output_file"
-            return 1  # Stop loop - success
-        elif [[ "$output" == *"$PROMISE_BLOCKED"* ]]; then
-            log "${RED}Task blocked - human intervention required${NC}"
-            notify "Ralph: BLOCKED! Human needed"
-            echo ""
-            echo "--- Blocked Output ---"
-            cat "$output_file"
-            echo "----------------------"
-            rm -f "$output_file"
-            return 2  # Stop loop - error
-        else
-            log "${RED}Unexpected output (no promise word found)${NC}"
-            echo ""
-            echo "--- Unexpected Output (last 50 lines) ---"
-            tail -50 "$output_file"
-            echo "------------------------------------------"
-            rm -f "$output_file"
-            return 2
-        fi
+    local output
+    output=$(cat "$output_file")
+
+    # Check for promise words
+    if [[ "$output" == *"$PROMISE_COMPLETE"* ]]; then
+        log "${GREEN}Task completed successfully${NC}"
+        rm -f "$output_file"
+        return 0  # Continue loop
+    elif [[ "$output" == *"$PROMISE_NO_ISSUES"* ]]; then
+        log "${YELLOW}No more issues available${NC}"
+        notify "Ralph: All issues complete!"
+        rm -f "$output_file"
+        return 1  # Stop loop - success
+    elif [[ "$output" == *"$PROMISE_BLOCKED"* ]]; then
+        log "${RED}Task blocked - human intervention required${NC}"
+        notify "Ralph: BLOCKED! Human needed"
+        rm -f "$output_file"
+        return 2  # Stop loop - error
     else
-        log "${RED}Claude command failed${NC}"
-        cat "$output_file"
+        log "${RED}Unexpected output (no promise word found)${NC}"
+        echo ""
+        echo "--- Last 50 lines ---"
+        tail -50 "$output_file"
+        echo "---------------------"
         rm -f "$output_file"
         return 2
     fi
