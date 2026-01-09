@@ -80,7 +80,8 @@ run_ralph_iteration() {
     # Run claude with ralph-task skill
     # --permission-mode acceptEdits allows autonomous operation
     # -p (--print) captures output for parsing
-    if claude --permission-mode acceptEdits -p "/ralph-task" > "$output_file" 2>&1; then
+    # tee shows output in real-time while capturing for promise word check
+    if claude --permission-mode acceptEdits -p "/ralph-task" 2>&1 | tee "$output_file"; then
         local output
         output=$(cat "$output_file")
 
