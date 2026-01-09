@@ -117,18 +117,12 @@ function Invoke-RalphIteration {
     Write-Log "==========================================" -Colour Cyan
 
     $tempFile = [System.IO.Path]::GetTempFileName()
-    $tempErrFile = "$tempFile.err"
 
     try {
         # Run claude with ralph-task skill
         # --permission-mode acceptEdits allows autonomous operation
-        $process = Start-Process -FilePath "claude" `
-            -ArgumentList "--permission-mode", "acceptEdits", "-p", "/ralph-task" `
-            -RedirectStandardOutput $tempFile `
-            -RedirectStandardError $tempErrFile `
-            -Wait `
-            -PassThru `
-            -NoNewWindow
+        # Tee-Object streams to console AND captures to file
+        $null = claude --permission-mode acceptEdits -p "/ralph-task" 2>&1 | Tee-Object -FilePath $tempFile
 
         $output = Get-Content -Path $tempFile -Raw -ErrorAction SilentlyContinue
 
@@ -171,7 +165,6 @@ function Invoke-RalphIteration {
     }
     finally {
         Remove-Item -Path $tempFile -Force -ErrorAction SilentlyContinue
-        Remove-Item -Path $tempErrFile -Force -ErrorAction SilentlyContinue
     }
 }
 
