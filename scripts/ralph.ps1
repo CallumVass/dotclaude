@@ -122,7 +122,7 @@ function Invoke-RalphIteration {
         # Run claude with ralph-task skill
         # --permission-mode acceptEdits allows autonomous operation
         # Tee-Object streams to console AND captures to file
-        $null = claude --permission-mode acceptEdits -p "/ralph-task" 2>&1 | Tee-Object -FilePath $tempFile
+        & claude --permission-mode acceptEdits -p "/ralph-task" 2>&1 | Tee-Object -FilePath $tempFile | Write-Host
 
         $output = Get-Content -Path $tempFile -Raw -ErrorAction SilentlyContinue
 
