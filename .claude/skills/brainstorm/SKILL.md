@@ -90,11 +90,14 @@ Cycle through these, adapting to context:
    - Ask user if they want to create issues from the spec
    - If yes, create epic + tasks using `bd create`
    - Link tasks to epic
+   - **CRITICAL: Use the Issue Description Format** from the "Autonomous-Ready Issues" section below
+   - **Always use `--validate` flag** to ensure required sections are present
    - **Tasks must be vertical slices** - each task includes its boundary and tests:
      - "Add user profile page" = component + component test
      - "Add profile API endpoint" = controller + request test
      - Never separate "implement X" from "test X" - testing is part of done
    - **For UI apps**: Create "Set up design system" as the FIRST issue
+   - **After creating issues**: Run `bd lint` to verify all issues have required sections
 
 6. Summarise what was captured and next steps.
 
@@ -279,13 +282,8 @@ When creating issues with `bd create`, use this structure:
 
 ### Example: Good Autonomous Issue
 
-```
-bd create "Add user avatar upload to profile settings"
-```
-
-With description:
-
-```markdown
+```bash
+bd create "Add user avatar upload to profile settings" --validate --description "$(cat <<'EOF'
 ## Summary
 Add avatar image upload functionality to the profile settings page.
 
@@ -295,23 +293,16 @@ Add avatar image upload functionality to the profile settings page.
 - [ ] Shows preview before save
 - [ ] Saves to user record on submit
 - [ ] Shows error for invalid files
-- [ ] Boundary tests cover component and API
 
 ## Implementation Hints
 - Entry point: src/pages/settings/profile.vue
 - Pattern to follow: src/pages/settings/notifications.vue (similar form)
 - Key files: src/api/users.ts, src/components/ImageUpload.vue (create)
-
-## Test Requirements
-| Boundary | Test Type |
-|----------|-----------|
-| ProfileSettings page | Component test with file upload mock |
-| PUT /api/users/:id/avatar | Request test |
-
-## Dependencies
-- Blocked by: none
-- Blocks: bd-c3d4 (avatar display in header)
+EOF
+)"
 ```
+
+**Note:** The `--validate` flag ensures beads rejects issues missing required sections (e.g., `## Acceptance Criteria` for tasks).
 
 ### Example: Too Vague (Not Autonomous-Ready)
 

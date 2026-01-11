@@ -14,15 +14,23 @@
 #   NOTIFY_CMD - Command to run for notifications (e.g., "terminal-notifier -message")
 #   LOG_FILE - Path to log file (default: ~/.claude/ralph.log)
 #   TIMEOUT_MINUTES - Timeout per iteration in minutes (default: 45)
+#   MAX_RETRIES - Retries per iteration for crashes/malformed requests (default: 3)
+#
+# Signals:
+#   Ctrl+C - Graceful stop after current operation (second Ctrl+C force-quits)
 #
 
-set -euo pipefail
+set -uo pipefail
 
 # Configuration
 MAX_ITERATIONS="${1:-10}"
 NOTIFY_CMD="${NOTIFY_CMD:-}"
 LOG_FILE="${LOG_FILE:-$HOME/.claude/ralph.log}"
 TIMEOUT_MINUTES="${TIMEOUT_MINUTES:-45}"  # Timeout per iteration
+MAX_RETRIES="${MAX_RETRIES:-3}"  # Retries per iteration for crashes/malformed requests
+
+# Track if we're being interrupted
+INTERRUPTED=false
 
 # Promise words
 PROMISE_COMPLETE="<promise>COMPLETE</promise>"
@@ -39,7 +47,8 @@ NC='\033[0m' # No Colour
 log() {
     local msg="[$(date '+%Y-%m-%d %H:%M:%S')] $1"
     echo -e "$msg"
-    echo "$msg" >> "$LOG_FILE"
+    # Strip ANSI codes for log file
+    echo -e "$msg" | sed 's/\x1b\[[0-9;]*m//g' >> "$LOG_FILE"
 }
 
 notify() {
@@ -100,11 +109,14 @@ run_ralph_iteration() {
         -p '/ralph-task' 2>&1 | tee "$output_file" | \
         jq -r 'select(.type == "assistant") | .message.content[]? | select(.type? == "text") | .text' 2>/dev/null || exit_code=$?
 
-    # Check for timeout (exit code 124)
+    # Append extracted text to log file (after streaming completes)
+    jq -r 'select(.type == "assistant") | .message.content[]? | select(.type? == "text") | .text' "$output_file" 2>/dev/null >> "$LOG_FILE"
+
+    # Check for timeout (exit code 124) - retry-able
     if [[ $exit_code -eq 124 ]]; then
-        log "${RED}Iteration timed out after ${TIMEOUT_MINUTES} minutes${NC}"
+        log "${YELLOW}Iteration timed out after ${TIMEOUT_MINUTES} minutes${NC}"
         rm -f "$output_file"
-        return 2
+        return 3  # Retry-able
     fi
 
     local output
@@ -127,12 +139,13 @@ run_ralph_iteration() {
         return 2  # Stop loop - error
     else
         log "${RED}Unexpected output (no promise word found)${NC}"
-        echo ""
-        echo "--- Last 50 lines of raw output ---"
+        log ""
+        log "--- Last 50 lines of raw output ---"
         tail -50 "$output_file"
-        echo "-----------------------------------"
+        tail -50 "$output_file" >> "$LOG_FILE"
+        log "-----------------------------------"
         rm -f "$output_file"
-        return 2
+        return 3  # Retry-able error
     fi
 }
 
@@ -142,6 +155,7 @@ main() {
     log "${BLUE}==========================================${NC}"
     log "Max iterations: $MAX_ITERATIONS"
     log "Timeout per iteration: ${TIMEOUT_MINUTES}m"
+    log "Max retries per iteration: $MAX_RETRIES"
     log "Log file: $LOG_FILE"
     log ""
 
@@ -151,13 +165,42 @@ main() {
     local iteration=1
 
     while [[ $iteration -le $MAX_ITERATIONS ]]; do
-        run_ralph_iteration $iteration
-        local result=$?
+        # Check if interrupted
+        if [[ "$INTERRUPTED" == "true" ]]; then
+            log "${YELLOW}Stopping due to interrupt...${NC}"
+            break
+        fi
+
+        local retry=0
+        local result=3  # Start with retry-able state
+
+        # Retry loop for crashes/malformed requests
+        while [[ $result -eq 3 && $retry -lt $MAX_RETRIES ]]; do
+            if [[ $retry -gt 0 ]]; then
+                log "${YELLOW}Retry $retry of $MAX_RETRIES for iteration $iteration${NC}"
+                sleep 5  # Brief pause before retry
+            fi
+
+            run_ralph_iteration $iteration
+            result=$?
+            ((++retry))
+
+            # Check if interrupted during iteration
+            if [[ "$INTERRUPTED" == "true" ]]; then
+                break
+            fi
+        done
+
+        # Check if interrupted
+        if [[ "$INTERRUPTED" == "true" ]]; then
+            log "${YELLOW}Stopping due to interrupt...${NC}"
+            break
+        fi
 
         if [[ $result -eq 0 ]]; then
             # Success - task completed, continue to next
-            ((completed++))
-            ((iteration++))
+            ((++completed))
+            ((++iteration))
             log ""
             log "Completed $completed task(s) so far. Continuing..."
             log ""
@@ -172,8 +215,17 @@ main() {
             log "${GREEN}==========================================${NC}"
             notify "Ralph done! Completed $completed tasks"
             exit 0
+        elif [[ $result -eq 3 ]]; then
+            # Exhausted retries
+            log ""
+            log "${RED}==========================================${NC}"
+            log "${RED}Ralph stopped - exhausted $MAX_RETRIES retries${NC}"
+            log "${RED}Completed before stop: $completed task(s)${NC}"
+            log "${RED}==========================================${NC}"
+            notify "Ralph: Exhausted retries after $completed tasks"
+            exit 1
         else
-            # Error/blocked
+            # Error/blocked (result=2)
             log ""
             log "${RED}==========================================${NC}"
             log "${RED}Ralph stopped - human intervention needed${NC}"
@@ -183,6 +235,16 @@ main() {
         fi
     done
 
+    # If we got here via interrupt, show status
+    if [[ "$INTERRUPTED" == "true" ]]; then
+        log ""
+        log "${YELLOW}==========================================${NC}"
+        log "${YELLOW}Ralph interrupted by user${NC}"
+        log "${YELLOW}Completed: $completed task(s)${NC}"
+        log "${YELLOW}==========================================${NC}"
+        exit 130
+    fi
+
     log ""
     log "${YELLOW}==========================================${NC}"
     log "${YELLOW}Max iterations ($MAX_ITERATIONS) reached${NC}"
@@ -191,7 +253,14 @@ main() {
     notify "Ralph: Max iterations reached ($completed tasks done)"
 }
 
-# Handle interrupts gracefully
-trap 'log "${YELLOW}Interrupted by user${NC}"; exit 130' INT TERM
+# Handle interrupts gracefully - set flag so we can clean up
+cleanup() {
+    INTERRUPTED=true
+    log "${YELLOW}Interrupt received - finishing current operation...${NC}"
+    # Kill any child processes in our process group
+    trap - INT TERM  # Reset trap to allow force-quit on second Ctrl+C
+}
+
+trap cleanup INT TERM
 
 main "$@"

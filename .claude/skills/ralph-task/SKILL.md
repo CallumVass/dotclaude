@@ -21,18 +21,110 @@ Output EXACTLY ONE of these at the END of your response:
 | `<promise>NO_ISSUES</promise>` | No issues available in bd ready. Loop should stop. |
 | `<promise>BLOCKED</promise>` | Blocked - needs human intervention. Loop should stop. |
 
+## Critical Rule
+
+**YOU MUST OUTPUT EXACTLY ONE PROMISE WORD BEFORE ENDING YOUR RESPONSE.**
+
+No exceptions. Every execution path must end with `<promise>COMPLETE</promise>`, `<promise>NO_ISSUES</promise>`, or `<promise>BLOCKED</promise>`. If you reach the end of your response without having output a promise word, you have failed.
+
 ## Constraints
 
 - **No user interaction** - make all decisions autonomously
 - **No AskUserQuestion** - this is fully autonomous
-- **No subagent spawning** - do codebase exploration directly with Grep/Glob/Read
-- **Max 3 code review cycles** - if `/code-review` fails 3 times, output BLOCKED
+- **No general subagent spawning** - do codebase exploration directly with Grep/Glob/Read
+- **ONLY spawn feature-dev:code-reviewer** - for code review in step 8, via Task tool
+- **No skill invocation** - do NOT run skills like /next-feature, /review-loop, /code-review, etc.
+- **Max 3 code review cycles** - if code-reviewer returns issues 3 times in a row, output BLOCKED
 - **Boundary tests mandatory** - task not complete without them
 - **Auto-merge on success** - merge PR when review passes
+- **Follow ALL steps in order** - do not skip steps or stop early without a promise word
 
 ## Process
 
-### 1. Check for Issues
+**Follow steps 0-12 in order. The ONLY valid exit points are:**
+- Step 1: Output `<promise>NO_ISSUES</promise>` if no issues available
+- Step 8: Output `<promise>BLOCKED</promise>` if code review exceeds 3 iterations
+- Step 9: Output `<promise>BLOCKED</promise>` if CI fails after fixes
+- Step 10: Output `<promise>BLOCKED</promise>` if merge fails
+- Step 12: Output `<promise>COMPLETE</promise>` after successful merge
+
+**Do not stop at any other point without a promise word.**
+
+### 0. Check for In-Progress Work (Resume Detection)
+
+**ALWAYS check this first before looking for new issues.**
+
+```bash
+bd list --status=in_progress --json
+```
+
+If there's an in-progress issue:
+
+1. **Note the issue ID and read its requirements**
+   ```bash
+   bd show <issue-id>
+   ```
+
+2. **Check for existing branch**
+   ```bash
+   git branch -a | grep -i <issue-id>
+   ```
+
+3. **Check for existing PR**
+   ```bash
+   gh pr list --head "feature/<issue-id>" --json number,state,url
+   ```
+
+4. **If branch exists, assess current state:**
+   ```bash
+   git checkout <branch-name>
+   git log --oneline main..<branch-name>  # What's been committed
+   git status                              # Any uncommitted work
+   git diff --stat main                    # Overall changes from main
+   ```
+
+5. **Compare state to issue requirements and determine resume point:**
+
+   | State | Resume From |
+   |-------|-------------|
+   | PR exists and OPEN | Step 8 (code review loop) |
+   | Branch has commits, quality checks pass, no PR | Step 7 (create PR) |
+   | Branch has commits, quality checks fail | Step 5 (fix and re-run quality checks) |
+   | Branch has commits but implementation incomplete | Step 4 (continue implementation) |
+   | Branch has uncommitted changes | Review changes, then step 4 or 5 |
+   | Branch exists but empty (no commits beyond main) | Step 3 (explore codebase) |
+   | No branch exists | Step 2 (create branch) |
+
+6. **To assess if implementation is complete:**
+   - Read the issue acceptance criteria
+   - Check if relevant files were created/modified
+   - Run quality checks: `mix compile --warnings-as-errors && mix test`
+   - If tests pass and criteria appear met → ready for PR
+   - If tests fail or criteria not met → continue implementation
+
+**Example resume scenarios:**
+
+```bash
+# Scenario A: Crashed during code review
+# - Branch exists, PR exists and open
+# - Resume at step 8
+
+# Scenario B: Crashed during implementation
+# - Branch exists with some commits
+# - git status shows uncommitted changes
+# - Tests fail
+# - Resume at step 4 (continue implementing)
+
+# Scenario C: Crashed after implementation but before PR
+# - Branch exists with commits
+# - Tests pass
+# - No PR yet
+# - Resume at step 7 (create PR)
+```
+
+If no in-progress issues found, continue to step 1.
+
+### 1. Check for New Issues
 
 If `issue` argument provided, use that. Otherwise:
 
@@ -51,15 +143,20 @@ And stop.
 
 Select top issue. Note the issue ID (e.g., `bd-a1b2`).
 
+Mark it as in-progress:
+```bash
+bd update <issue-id> --status=in_progress
+```
+
 ### 2. Create Feature Branch
 
 ```bash
 git checkout main
 git pull origin main
-git checkout -b feature/bd-xxx-short-description
+git checkout -b feature/<issue-id>-short-description
 ```
 
-Use issue ID and slugified title. Example: `feature/bd-a1b2-add-user-auth`
+Use issue ID and slugified title. Example: `feature/kanban-vfa.2-add-user-auth`
 
 ### 3. Explore Codebase
 
@@ -123,11 +220,9 @@ If quality checks fail:
 ### 6. Commit and Push
 
 ```bash
-bd status <issue-id> done
 git add -A
 git commit -m "Description (bd-xxx)"
 git push -u origin HEAD
-bd sync
 ```
 
 ### 7. Create PR
@@ -150,6 +245,17 @@ Capture PR URL/number from output.
 
 ### 8. Code Review Loop (Max 3 iterations)
 
+**IMPORTANT**: This is ONE step in the workflow. You are reviewing YOUR OWN PR that you just created in step 7. After code review completes, you MUST either fix issues or continue to step 9. Do not end here.
+
+**Use `feature-dev:code-reviewer` agent** - DO NOT use the `/code-review` skill. The agent returns issues directly which allows proper fix/re-review cycling.
+
+First, get the list of changed files:
+```bash
+git diff --name-only main...HEAD
+```
+
+Then run the review loop:
+
 ```
 review_count = 0
 
@@ -159,20 +265,55 @@ LOOP:
   IF review_count > 3:
     Output: "Code review exceeded 3 iterations. Human review required."
     Output: <promise>BLOCKED</promise>
-    STOP
+    STOP ENTIRELY (do not continue to step 9)
 
-  Run /code-review (the Anthropic code-review plugin)
+  Spawn Task with:
+    - subagent_type: "feature-dev:code-reviewer"
+    - prompt: |
+        Review the following files for bugs, logic errors, security issues, and code quality problems.
 
-  IF issues found:
-    Fix issues
-    git add -A
-    git commit --amend --no-edit
-    git push --force-with-lease
-    CONTINUE LOOP
+        ## Task Context
+        Issue: [issue-id]
+        Title: [issue title]
+        Acceptance Criteria:
+        [paste acceptance criteria from bd show output captured in step 0/1]
 
-  IF no issues:
-    EXIT LOOP
+        ## Review Focus
+        1. Does the implementation meet the acceptance criteria?
+        2. Are there bugs, logic errors, or security issues?
+        3. Does the code follow project patterns?
+
+        List ONLY issues with confidence >= 80. For each issue, include: file path, line number, description, and suggested fix. If the implementation meets acceptance criteria and no issues found, respond with exactly 'NO ISSUES FOUND'.
+
+        Files to review:
+        [list files from git diff]
+
+  READ the agent response carefully.
+
+  IF response contains "NO ISSUES FOUND":
+    EXIT LOOP and CONTINUE TO STEP 9
+
+  IF issues were found:
+    For EACH issue in the response:
+      1. Read the file mentioned
+      2. Fix the issue using Edit tool
+      3. Log what you fixed
+
+    After fixing ALL issues:
+      git add -A
+      git commit --amend --no-edit
+      git push --force-with-lease
+
+    CONTINUE LOOP (run code review again to verify fixes)
 ```
+
+**Key points:**
+- The code-reviewer agent returns issues directly to you (not posted as GitHub comments)
+- You must parse the issues, fix them yourself, then re-review
+- Only exit when "NO ISSUES FOUND" or blocked after 3 iterations
+- **DO NOT** end your response after seeing issues - you must fix them
+
+After exiting the loop successfully, proceed immediately to step 9.
 
 ### 9. Verify CI (if applicable)
 
@@ -194,12 +335,16 @@ gh pr merge --squash --delete-branch
 If merge fails (e.g., conflict):
 - Output `<promise>BLOCKED</promise>` with error details
 
-### 11. Cleanup
+### 11. Cleanup and Close Issue
 
 ```bash
 git checkout main
 git pull origin main
+bd close <issue-id>
+bd sync
 ```
+
+The `bd close` marks the issue as complete AFTER successful merge.
 
 ### 12. Complete
 
@@ -259,3 +404,31 @@ PR: https://github.com/owner/repo/pull/123 (open, needs review)
 
 <promise>BLOCKED</promise>
 ```
+
+---
+
+## Catch-All Safety Net
+
+If you somehow reach a state where:
+- You've completed some work but aren't sure which promise to output
+- An unexpected error occurred
+- You got confused about the workflow
+- Any other edge case
+
+**Output `<promise>BLOCKED</promise>` with an explanation of what happened.**
+
+Example:
+```
+## Unexpected State
+
+Reached end of workflow without clear completion status.
+- Started working on: bd-a1b2
+- Got to step: 7 (Create PR)
+- Unexpected situation: [describe what happened]
+
+Human review recommended.
+
+<promise>BLOCKED</promise>
+```
+
+**NEVER end your response without a promise word. When in doubt, use BLOCKED.**
