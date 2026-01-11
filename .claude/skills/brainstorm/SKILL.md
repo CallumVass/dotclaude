@@ -51,6 +51,11 @@ Cycle through these, adapting to context:
 - "What's the riskiest assumption?"
 - "Where might we be wrong?"
 
+**Deployment & Operations** (if not already configured - see Detection)
+- "Where should this run - edge, containers, serverless?"
+- "What's the deploy cadence - continuous on merge, or batched releases?"
+- "Any database or persistent storage needs?"
+
 ## Process
 
 1. Gather context (in order of preference):
@@ -82,11 +87,15 @@ Cycle through these, adapting to context:
    - Structure: Overview, Requirements, Technical Design, Open Questions
    - Be concrete - include decisions made, not just questions asked
 
-4. **If app has a UI** (React, Vue, Svelte, Next.js, dashboards, web apps, etc.):
+4. **For new projects** (no existing CI/deployment detected):
+   - Establish CI and deployment infrastructure BEFORE feature work
+   - See **Deployment & CI Phase** below
+
+5. **If app has a UI** (React, Vue, Svelte, Next.js, dashboards, web apps, etc.):
    - Establish design system BEFORE creating implementation issues
    - See **Design System Phase** below
 
-5. If beads is initialized (`bd version` succeeds) and create-issues not disabled:
+6. If beads is initialized (`bd version` succeeds) and create-issues not disabled:
    - Ask user if they want to create issues from the spec
    - If yes, create epic + tasks using `bd create`
    - Link tasks to epic
@@ -96,10 +105,169 @@ Cycle through these, adapting to context:
      - "Add user profile page" = component + component test
      - "Add profile API endpoint" = controller + request test
      - Never separate "implement X" from "test X" - testing is part of done
-   - **For UI apps**: Create "Set up design system" as the FIRST issue
+   - **Issue creation order** (infrastructure before features):
+     1. "Set up GitHub Actions CI" (if no CI detected)
+     2. "Set up deployment to [Platform]" (if no deployment detected)
+     3. "Configure production environment" (secrets, env vars, DB connection)
+     4. "Set up design system" (if UI app)
+     5. Feature issues...
    - **After creating issues**: Run `bd lint` to verify all issues have required sections
 
-6. Summarise what was captured and next steps.
+7. Summarise what was captured and next steps.
+
+---
+
+## Deployment & CI Phase (New Projects)
+
+For new projects, establish CI and deployment infrastructure BEFORE feature work. "Deploy early, deploy often" - every vertical slice should be deployable from day one.
+
+### Detection - Skip If Already Configured
+
+Check for existing infrastructure before asking deployment questions:
+
+**CI Detection:**
+```bash
+# GitHub Actions
+ls .github/workflows/*.yml .github/workflows/*.yaml 2>/dev/null
+```
+If workflows exist → skip CI questions, note existing setup in spec.
+
+**Deployment Detection:**
+```bash
+# Fly.io
+ls fly.toml 2>/dev/null
+
+# Cloudflare
+ls wrangler.toml wrangler.json wrangler.jsonc 2>/dev/null
+```
+If deployment config exists → skip deployment questions, note existing setup in spec.
+
+### When to Trigger
+
+Only ask deployment/CI questions when:
+- No existing CI config detected AND/OR no deployment config detected
+- Project appears to be new (few commits, no releases)
+- User mentions "new project", "starting fresh", "greenfield"
+
+### Stack → Platform Recommendations
+
+| Stack | Recommended Platform | Reason |
+|-------|---------------------|--------|
+| Elixir/Phoenix | Fly.io | Native BEAM support, easy clustering |
+| .NET | Fly.io | Container-based, good .NET support |
+| Node.js (full-stack) | Fly.io | Containers with persistent storage |
+| Node.js (edge/static) | Cloudflare Pages/Workers | Edge-first, excellent DX |
+| Static + API | Cloudflare Pages + Workers | Fast global CDN |
+| Any with PostgreSQL | Fly.io | Fly Postgres or easy DB attachment |
+
+### Deployment Questions
+
+Ask using AskUserQuestion (only if not detected):
+
+1. **Platform preference**:
+   - Fly.io (containers, databases, full-stack)
+   - Cloudflare (edge, static, serverless)
+   - Other (specify)
+
+2. **Deploy trigger**:
+   - Continuous (deploy on every main merge)
+   - Manual (deploy on demand/tag)
+
+### Output: Infrastructure Spec
+
+Add an **Infrastructure** section to the spec file:
+
+```markdown
+## Infrastructure
+
+### CI (GitHub Actions)
+- Trigger: Push to main, PRs
+- Steps: Lint → Test → Build
+- Required checks before merge: Yes
+
+### Deployment
+- Platform: [Fly.io / Cloudflare]
+- Trigger: [On main merge / Manual]
+- Environment: [Production only / Staging + Production]
+```
+
+### Persist to CLAUDE.md
+
+Key infrastructure decisions must survive session boundaries. Append to CLAUDE.md:
+
+```markdown
+## Infrastructure
+
+### Deployment
+- Platform: [Fly.io / Cloudflare]
+- Deploy command: [fly deploy / wrangler deploy]
+- Secrets: [fly secrets set / wrangler secret put]
+
+### CI
+- All PRs must pass CI before merge
+- Run `[mix test / npm test / dotnet test]` locally before pushing
+
+### Environment Variables
+See `.env.example` for required variables.
+```
+
+### First Beads Issues (Infrastructure)
+
+When creating issues, infrastructure comes FIRST:
+
+```bash
+# 1. CI (always first)
+bd create "Set up GitHub Actions CI" --validate --description "$(cat <<'EOF'
+## Summary
+Configure GitHub Actions for continuous integration.
+
+## Acceptance Criteria
+- [ ] Workflow runs on push to main and PRs
+- [ ] Runs lint, test, build steps
+- [ ] Required status check before merge enabled
+
+## Implementation Hints
+- Create .github/workflows/ci.yml
+- Use appropriate action for stack (actions/setup-node, erlef/setup-beam, actions/setup-dotnet)
+EOF
+)"
+
+# 2. Deployment (second)
+bd create "Set up deployment to [Platform]" --validate --description "$(cat <<'EOF'
+## Summary
+Configure automated deployment to [Fly.io/Cloudflare].
+
+## Acceptance Criteria
+- [ ] Deploy succeeds on main branch merge
+- [ ] Secrets configured in GitHub
+- [ ] Health check passes post-deploy
+
+## Implementation Hints
+- Fly.io: fly launch, add deploy job to CI
+- Cloudflare: wrangler.toml, pages/workers config
+EOF
+)"
+
+# 3. Production environment (third)
+bd create "Configure production environment" --validate --description "$(cat <<'EOF'
+## Summary
+Set up production secrets, environment variables, and external service connections.
+
+## Acceptance Criteria
+- [ ] All required secrets documented in README or .env.example
+- [ ] Secrets configured in deployment platform
+- [ ] Database connection configured (if applicable)
+- [ ] External API keys configured (if applicable)
+- [ ] App boots successfully in production with all services connected
+
+## Implementation Hints
+- Create .env.example with all required variables (no values)
+- Document secret setup in README
+- Fly.io: fly secrets set KEY=value
+- Cloudflare: wrangler secret put KEY
+EOF
+)"
+```
 
 ---
 
@@ -118,7 +286,18 @@ Detect UI app via:
 
 Ask the user using AskUserQuestion:
 
-1. **Tone/personality**: What feel should this have?
+1. **CSS framework** (if not already in project):
+   - Tailwind CSS
+   - UnoCSS
+   - Other
+
+2. **Package manager** (for JS/TS projects, if not already configured):
+   - pnpm (recommended)
+   - npm
+   - yarn
+   - bun
+
+3. **Tone/personality**: What feel should this have?
    - Precision & density (Linear, Raycast style)
    - Warmth & approachability (Notion, Coda style)
    - Sophistication & trust (Stripe, Mercury style)
@@ -127,12 +306,12 @@ Ask the user using AskUserQuestion:
    - Dark & moody
    - Playful & colourful
 
-2. **Palette preference**:
+4. **Palette preference**:
    - Light mode, dark mode, or both?
    - Primary brand colour (if any)?
    - Warm, cool, or neutral foundation?
 
-3. **Inspiration**: Any reference sites or design systems to draw from?
+5. **Inspiration**: Any reference sites or design systems to draw from?
 
 ### Output: Design System Spec
 
@@ -215,15 +394,89 @@ Add a **Design System** section to the spec file with:
 - **Component reuse**: Check patterns before creating new components
 ```
 
+### Persist to CLAUDE.md
+
+**CRITICAL**: SPEC.md is not automatically read by new Claude sessions. Key constraints MUST be added to CLAUDE.md to survive session boundaries.
+
+After establishing the design system, append to CLAUDE.md:
+
+```markdown
+## UI Development
+
+**Read SPEC.md** for full design system before creating any UI.
+
+### Tooling
+- CSS: [Tailwind / UnoCSS]
+- Package manager: [pnpm / npm / yarn / bun]
+
+### Component Location
+[Stack-specific - see below]
+
+### Constraints
+- Use semantic tokens from SPEC.md design system (e.g., `text-foreground-muted` not `text-gray-500`)
+- Check existing components before creating new ones
+- All shared/reusable components go in [component location]
+```
+
+**Stack-specific component locations:**
+
+| Stack | Shared Components Location | Notes |
+|-------|---------------------------|-------|
+| Phoenix/LiveView | `lib/[app]_web/components/core_components.ex` | Add to existing file, use `attr` and `slot` |
+| React/Next.js | `src/components/ui/` | One component per file |
+| Vue/Nuxt | `components/ui/` | Auto-imported |
+| Svelte/SvelteKit | `src/lib/components/` | Export from `$lib` |
+
+**Phoenix/LiveView example** (add to CLAUDE.md):
+
+```markdown
+## UI Development
+
+**Read SPEC.md** for full design system before creating any UI.
+
+### Component Location
+All shared components go in `lib/[app]_web/components/core_components.ex`.
+
+Before creating a component in a LiveView:
+1. Check if it exists in core_components.ex
+2. If similar component exists, extend it with variants
+3. Only create inline if truly one-off (rare)
+
+### Existing Components
+- `<.button>` - primary, secondary, ghost variants
+- `<.input>` - text, email, password, textarea
+- `<.badge>` - status indicators
+- [Add as you create them]
+```
+
 ### First Beads Issue
 
-When creating issues, the FIRST issue for a UI app should be:
+When creating issues, infrastructure and design system issues come first (see Issue Creation Order above).
 
-```
-bd create "Set up design system" --description "Configure Tailwind/UnoCSS with semantic tokens, establish base component patterns per SPEC.md design system section"
+For UI apps, the design system issue should be:
+
+```bash
+bd create "Set up design system" --validate --description "$(cat <<'EOF'
+## Summary
+Configure Tailwind/UnoCSS with semantic tokens and establish shared component patterns.
+
+## Acceptance Criteria
+- [ ] CSS framework config extended with semantic tokens from SPEC.md
+- [ ] Base components added to [core_components.ex / components/ui/]
+- [ ] CLAUDE.md updated with UI development constraints
+- [ ] Component location documented
+
+## Implementation Hints
+- Entry point: SPEC.md design system section
+- Tailwind: tailwind.config.js (or assets/tailwind.config.js for Phoenix)
+- UnoCSS: uno.config.ts theme.extend
+- Phoenix: extend core_components.ex
+- Other: create components/ui/ directory
+EOF
+)"
 ```
 
-This ensures the design system is implemented before any feature work begins.
+This ensures the design system is implemented AND documented before any feature work begins.
 
 ## Interview Style
 
