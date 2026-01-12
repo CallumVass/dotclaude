@@ -17,6 +17,7 @@ Run code review in a loop until no issues remain.
 - Every issue must be either fixed or dismissed with a reason
 - Exit only when reviewer returns "NO ISSUES FOUND"
 - **Boundary tests are mandatory** - new UI/API code must have corresponding tests
+- **Mandatory constraints from CLAUDE.md always apply** - check for a "Mandatory Constraints" section
 
 ## File Detection
 
@@ -31,15 +32,21 @@ If no files detected, inform user and exit.
 
 1. Detect files to review. Show list to user.
 
-2. Loop:
-   - Spawn `feature-dev:code-reviewer` with the file list
+2. Check for mandatory constraints:
+   - Read CLAUDE.md if it exists
+   - Look for "Mandatory Constraints" section (typically marked with `╔═══...═══╗`)
+   - Include these in the review prompt as non-dismissible rules
+
+3. Loop:
+   - Spawn `feature-dev:code-reviewer` with the file list and mandatory constraints
    - If response is "NO ISSUES FOUND", exit loop
    - For each issue: evaluate if valid (real problem, in scope, should be fixed)
+   - **[MC] prefixed issues (mandatory constraint violations) cannot be dismissed**
    - Fix valid issues with Edit tool
-   - Dismiss invalid issues with documented reason
+   - Dismiss invalid issues with documented reason (except [MC] issues)
    - Continue loop (fixes may introduce new issues)
 
-3. Check boundary tests:
+4. Check boundary tests:
    - For each new/modified file, identify if it's a boundary (controller, page, component, API endpoint)
    - If boundary code exists without corresponding test file, flag as issue
    - Test must exercise the boundary, not internal collaborators
@@ -58,7 +65,7 @@ If no files detected, inform user and exit.
    - Unit tests for services called by controllers
    - Tests that mock the thing they're supposed to test
 
-4. Report results:
+5. Report results:
    - Number of iterations
    - Fixes made (what and where)
    - Issues dismissed (what and why)

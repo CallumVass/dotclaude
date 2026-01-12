@@ -49,8 +49,9 @@ $PROMISE_COMPLETE = "<promise>COMPLETE</promise>"
 $PROMISE_NO_ISSUES = "<promise>NO_ISSUES</promise>"
 $PROMISE_BLOCKED = "<promise>BLOCKED</promise>"
 
-# Track interruption
+# Track interruption and current job
 $script:Interrupted = $false
+$script:CurrentJob = $null
 
 # Colours (ANSI escape codes for cross-platform support)
 $RED = "`e[0;31m"
@@ -128,7 +129,7 @@ function Invoke-RalphIteration {
 
     try {
         # Create a job to run claude with timeout
-        $job = Start-Job -ScriptBlock {
+        $script:CurrentJob = Start-Job -ScriptBlock {
             param($outputPath)
 
             $output = & claude `
@@ -156,6 +157,7 @@ function Invoke-RalphIteration {
                 }
             }
         } -ArgumentList $outputFile
+        $job = $script:CurrentJob
 
         # Wait with timeout
         $completed = Wait-Job -Job $job -Timeout ($TimeoutMinutes * 60)
@@ -164,6 +166,7 @@ function Invoke-RalphIteration {
             # Timeout occurred
             Stop-Job -Job $job
             Remove-Job -Job $job -Force
+            $script:CurrentJob = $null
             Write-Log "${YELLOW}Iteration timed out after $TimeoutMinutes minutes${NC}"
             Remove-Item -Path $outputFile -Force -ErrorAction SilentlyContinue
             return 3  # Retry-able
@@ -177,6 +180,7 @@ function Invoke-RalphIteration {
             $textOutput | Add-Content -Path $LogFile
         }
         Remove-Job -Job $job -Force
+        $script:CurrentJob = $null
 
         # Read full output for promise word detection
         $output = Get-Content -Path $outputFile -Raw -ErrorAction SilentlyContinue
@@ -327,19 +331,64 @@ function Start-Ralph {
     Send-Notification "Ralph: Max iterations reached ($completed tasks done)"
 }
 
+# Track if cleanup has run
+$script:CleanupDone = $false
+
+# Cleanup function to kill child processes
+function Stop-ChildProcesses {
+    param([switch]$IsInterrupt)
+
+    # Only run cleanup once
+    if ($script:CleanupDone) {
+        return
+    }
+    $script:CleanupDone = $true
+
+    if ($IsInterrupt) {
+        $script:Interrupted = $true
+        Write-Log "${YELLOW}Interrupt received - killing child processes...${NC}"
+    }
+
+    # Stop the current job if running
+    if ($script:CurrentJob) {
+        try {
+            Stop-Job -Job $script:CurrentJob -ErrorAction SilentlyContinue
+            Remove-Job -Job $script:CurrentJob -Force -ErrorAction SilentlyContinue
+        }
+        catch {
+            # Ignore errors during cleanup
+        }
+        $script:CurrentJob = $null
+    }
+
+    # Kill any orphaned claude processes started by this script
+    # Get child processes of the current PowerShell process
+    $currentPid = $PID
+    Get-CimInstance Win32_Process -Filter "ParentProcessId = $currentPid" -ErrorAction SilentlyContinue |
+        ForEach-Object {
+            try {
+                Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
+            }
+            catch {
+                # Ignore errors
+            }
+        }
+}
+
 # Handle Ctrl+C gracefully
 $null = Register-EngineEvent -SourceIdentifier PowerShell.Exiting -Action {
-    $script:Interrupted = $true
-    Write-Log "${YELLOW}Interrupt received - finishing current operation...${NC}"
+    Stop-ChildProcesses -IsInterrupt
 }
 
 try {
-    # Set up Ctrl+C handler
-    [Console]::TreatControlCAsInput = $false
-
     Start-Ralph
 }
+catch {
+    # Ctrl+C throws a PipelineStoppedException or similar
+    Stop-ChildProcesses -IsInterrupt
+}
 finally {
-    # Cleanup
+    # Cleanup (without interrupt message on normal exit)
+    Stop-ChildProcesses
     Unregister-Event -SourceIdentifier PowerShell.Exiting -ErrorAction SilentlyContinue
 }

@@ -36,14 +36,32 @@ No exceptions. Every execution path must end with `<promise>COMPLETE</promise>`,
 - **No skill invocation** - do NOT run skills like /next-feature, /review-loop, /code-review, etc.
 - **Max 3 code review cycles** - if code-reviewer returns issues 3 times in a row, output BLOCKED
 - **Boundary tests mandatory** - task not complete without them
+- **ALL acceptance criteria mandatory** - every AC item must be completed, no exceptions
 - **Auto-merge on success** - merge PR when review passes
 - **Follow ALL steps in order** - do not skip steps or stop early without a promise word
+
+## Mandatory Constraints
+
+**In addition to issue-specific acceptance criteria, ALL implementations must satisfy mandatory constraints from the project's CLAUDE.md.**
+
+At the start of any task, check if CLAUDE.md contains a "Mandatory Constraints" section (typically marked with a box like `╔═══...═══╗`). These rules define HOW to build, while AC defines WHAT to build.
+
+Common mandatory constraints include:
+- Framework/library choices (e.g., "All UI is Vue components")
+- Styling rules (e.g., "Tailwind only, semantic tokens")
+- Testing requirements (e.g., "Every feature MUST include tests")
+- Accessibility rules (e.g., "44px touch targets")
+
+**These are enforced alongside AC during code review (step 8) and verification (step 8.5).**
+
+---
 
 ## Process
 
 **Follow steps 0-12 in order. The ONLY valid exit points are:**
 - Step 1: Output `<promise>NO_ISSUES</promise>` if no issues available
 - Step 8: Output `<promise>BLOCKED</promise>` if code review exceeds 3 iterations
+- Step 8.5: Output `<promise>BLOCKED</promise>` if ANY acceptance criterion is not met
 - Step 9: Output `<promise>BLOCKED</promise>` if CI fails after fixes
 - Step 10: Output `<promise>BLOCKED</promise>` if merge fails
 - Step 12: Output `<promise>COMPLETE</promise>` after successful merge
@@ -278,12 +296,30 @@ LOOP:
         Acceptance Criteria:
         [paste acceptance criteria from bd show output captured in step 0/1]
 
-        ## Review Focus
-        1. Does the implementation meet the acceptance criteria?
-        2. Are there bugs, logic errors, or security issues?
-        3. Does the code follow project patterns?
+        ## Mandatory Constraints (from CLAUDE.md)
+        [If CLAUDE.md has a "Mandatory Constraints" section, paste it here. These apply to ALL code.]
+        Example constraints to check for:
+        - Framework/library requirements (e.g., Vue-only UI, no Phoenix function components)
+        - Styling rules (e.g., Tailwind-only, semantic tokens like bg-surface not bg-gray-100)
+        - Testing requirements
+        - Accessibility rules (e.g., 44px touch targets)
 
-        List ONLY issues with confidence >= 80. For each issue, include: file path, line number, description, and suggested fix. If the implementation meets acceptance criteria and no issues found, respond with exactly 'NO ISSUES FOUND'.
+        ## Review Focus
+        1. Does the implementation meet ALL acceptance criteria? (CRITICAL - check each one)
+        2. Does the implementation follow ALL mandatory constraints from CLAUDE.md?
+        3. Are there bugs, logic errors, or security issues?
+        4. Does the code follow project patterns?
+
+        **IMPORTANT**: Both AC issues AND mandatory constraint violations are BLOCKING.
+        - AC issues: prefix with "[AC]"
+        - Mandatory constraint violations: prefix with "[MC]"
+        These cannot be dismissed or skipped.
+
+        List ONLY issues with confidence >= 80. For each issue, include: file path, line number, description, and suggested fix.
+        For AC issues, use format: "[AC] <criterion not met>: <what's missing>"
+        For mandatory constraint issues, use format: "[MC] <constraint violated>: <what's wrong>"
+
+        If ALL acceptance criteria are met, ALL mandatory constraints satisfied, and no other issues found, respond with exactly 'NO ISSUES FOUND'.
 
         Files to review:
         [list files from git diff]
@@ -295,9 +331,15 @@ LOOP:
 
   IF issues were found:
     For EACH issue in the response:
-      1. Read the file mentioned
-      2. Fix the issue using Edit tool
-      3. Log what you fixed
+      1. Check if it's an [AC] issue (acceptance criteria) or [MC] issue (mandatory constraint)
+      2. [AC] and [MC] issues are MANDATORY - you MUST fix them, no dismissing
+      3. Read the file mentioned
+      4. Fix the issue using Edit tool
+      5. Log what you fixed
+
+    **CRITICAL**: If an [AC] or [MC] issue requires installing a dependency, adding config,
+    or any other action - DO IT. "Not installed" or "can't do this" is NOT acceptable.
+    Either complete the requirement or output BLOCKED.
 
     After fixing ALL issues:
       git add -A
@@ -310,10 +352,90 @@ LOOP:
 **Key points:**
 - The code-reviewer agent returns issues directly to you (not posted as GitHub comments)
 - You must parse the issues, fix them yourself, then re-review
+- **[AC] and [MC] issues are NON-DISMISSIBLE** - they must be fixed or you must BLOCK
 - Only exit when "NO ISSUES FOUND" or blocked after 3 iterations
 - **DO NOT** end your response after seeing issues - you must fix them
 
-After exiting the loop successfully, proceed immediately to step 9.
+After exiting the loop successfully, proceed immediately to step 8.5.
+
+### 8.5 Acceptance Criteria & Mandatory Constraints Verification (MANDATORY)
+
+**This step is NON-NEGOTIABLE. You cannot skip it or proceed without completing it.**
+
+Before moving to step 9, explicitly verify EVERY acceptance criterion AND mandatory constraint is met:
+
+1. **Parse AC into checklist**: Extract each acceptance criterion from the issue (captured in step 0/1)
+
+2. **Parse MC into checklist**: Extract mandatory constraints from CLAUDE.md (if present)
+
+3. **Verify EACH item individually**:
+   ```
+   For each AC item:
+     - State the criterion
+     - Describe how it was implemented (file, function, test)
+     - Verify it works (run command, check file exists, etc.)
+     - Mark as DONE or NOT DONE
+
+   For each relevant MC item:
+     - State the constraint
+     - Verify the implementation follows it
+     - Mark as DONE or NOT DONE
+   ```
+
+4. **Handle incomplete items**:
+   - If ANY AC or MC item is NOT DONE: you must either implement it NOW or output BLOCKED
+   - "Can't do this" is NOT acceptable - either do it or BLOCK
+   - "Skipping because X isn't installed" is NOT acceptable - install X or BLOCK
+
+**Example verification:**
+
+```
+## AC Verification for bd-a1b2
+
+1. [x] "Add Credo to dependencies"
+   - Implemented: Added {:credo, "~> 1.7"} to mix.exs deps
+   - Verified: mix deps.get succeeds, credo available
+
+2. [x] "Configure CI to run Credo in strict mode"
+   - Implemented: Added "mix credo --strict" step to .github/workflows/ci.yml
+   - Verified: File contains the step
+
+3. [x] "Credo passes locally"
+   - Verified: Ran `mix credo --strict`, exits 0
+
+## MC Verification (Mandatory Constraints)
+
+1. [x] "Tests required for every feature"
+   - Verified: Added test in test/credo_integration_test.exs
+
+2. [x] "Tailwind only, semantic tokens"
+   - N/A: No UI changes in this task
+
+3. [x] "44px touch targets"
+   - N/A: No UI changes in this task
+
+All AC and MC items complete. Proceeding to step 9.
+```
+
+**Example of WRONG behavior:**
+```
+AC: "Configure Credo in CI"
+Response: "Credo isn't installed, skipping this AC item"
+```
+This is WRONG. Correct behavior: Install Credo, configure CI, or output BLOCKED.
+
+**If ANY AC item cannot be completed:**
+```
+## AC Verification FAILED
+
+Item not complete: "Configure Credo in CI"
+Reason: [explain why it cannot be done]
+Action needed: [what human needs to do]
+
+<promise>BLOCKED</promise>
+```
+
+Only proceed to step 9 after ALL AC items are verified as DONE.
 
 ### 9. Verify CI (if applicable)
 
@@ -370,6 +492,8 @@ Output summary of what was built:
 | No issues in bd ready | Output `<promise>NO_ISSUES</promise>` |
 | Quality checks fail 3x | Output `<promise>BLOCKED</promise>` with error details |
 | Code review exceeds 3 iterations | Output `<promise>BLOCKED</promise>` |
+| **Acceptance criterion not met** | Output `<promise>BLOCKED</promise>` - NEVER skip AC items |
+| **Mandatory constraint violated** | Output `<promise>BLOCKED</promise>` - NEVER skip MC items |
 | CI checks fail after fixes | Output `<promise>BLOCKED</promise>` |
 | Merge conflict | Output `<promise>BLOCKED</promise>` |
 | Any unexpected error | Output `<promise>BLOCKED</promise>` with context |

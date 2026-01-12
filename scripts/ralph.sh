@@ -253,11 +253,12 @@ main() {
     notify "Ralph: Max iterations reached ($completed tasks done)"
 }
 
-# Handle interrupts gracefully - set flag so we can clean up
+# Handle interrupts gracefully - kill children and set flag
 cleanup() {
     INTERRUPTED=true
-    log "${YELLOW}Interrupt received - finishing current operation...${NC}"
-    # Kill any child processes in our process group
+    log "${YELLOW}Interrupt received - killing child processes...${NC}"
+    # Kill all child processes of this script
+    pkill -P $$ 2>/dev/null || true
     trap - INT TERM  # Reset trap to allow force-quit on second Ctrl+C
 }
 
