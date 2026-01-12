@@ -25,10 +25,14 @@
 .PARAMETER NotifyCmd
     Command to run for notifications (optional)
 
+.PARAMETER ReviewInterval
+    Run batch review every N completed tasks (default: 5)
+
 .EXAMPLE
     ./ralph.ps1
     ./ralph.ps1 -MaxIterations 5
     ./ralph.ps1 -TimeoutMinutes 30 -MaxRetries 2
+    ./ralph.ps1 -ReviewInterval 3
 #>
 
 [CmdletBinding()]
@@ -37,21 +41,30 @@ param(
     [int]$TimeoutMinutes = 45,
     [int]$MaxRetries = 3,
     [string]$LogFile = (Join-Path $env:USERPROFILE ".claude\ralph.log"),
-    [string]$NotifyCmd = $env:NOTIFY_CMD
+    [string]$NotifyCmd = $env:NOTIFY_CMD,
+    [int]$ReviewInterval = 5
 )
 
 # Ensure strict mode
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-# Promise words
+# Promise words - ralph-task
 $PROMISE_COMPLETE = "<promise>COMPLETE</promise>"
 $PROMISE_NO_ISSUES = "<promise>NO_ISSUES</promise>"
 $PROMISE_BLOCKED = "<promise>BLOCKED</promise>"
 
+# Promise words - ralph-review
+$PROMISE_REVIEW_COMPLETE = "<promise>REVIEW_COMPLETE</promise>"
+$PROMISE_REVIEW_BLOCKED = "<promise>REVIEW_BLOCKED</promise>"
+
 # Track interruption and current job
 $script:Interrupted = $false
 $script:CurrentJob = $null
+
+# Batch tracking
+$script:BatchStartCommit = ""
+$script:TasksSinceReview = 0
 
 # Colours (ANSI escape codes for cross-platform support)
 $RED = "`e[0;31m"
@@ -224,6 +237,91 @@ function Invoke-RalphIteration {
     }
 }
 
+function Invoke-RalphReview {
+    param([int]$TasksCount)
+
+    $outputFile = [System.IO.Path]::GetTempFileName()
+
+    Write-Log "${BLUE}========================================${NC}"
+    Write-Log "${BLUE}Running Batch Review${NC}"
+    Write-Log "${BLUE}========================================${NC}"
+    Write-Log "Reviewing last $TasksCount task(s) since commit $($script:BatchStartCommit)"
+    Write-Log ""
+
+    try {
+        $job = Start-Job -ScriptBlock {
+            param($outputPath, $startCommit, $count)
+
+            $output = & claude `
+                --dangerously-skip-permissions `
+                --output-format stream-json `
+                --verbose `
+                -p "/ralph-review --start_commit=$startCommit --tasks_count=$count" 2>&1
+
+            $output | Out-File -FilePath $outputPath -Encoding utf8
+
+            # Stream text output
+            $output | ForEach-Object {
+                try {
+                    $json = $_ | ConvertFrom-Json -ErrorAction SilentlyContinue
+                    if ($json.type -eq "assistant" -and $json.message.content) {
+                        foreach ($content in $json.message.content) {
+                            if ($content.type -eq "text") {
+                                Write-Output $content.text
+                            }
+                        }
+                    }
+                }
+                catch {
+                    # Not valid JSON, skip
+                }
+            }
+        } -ArgumentList $outputFile, $script:BatchStartCommit, $TasksCount
+
+        # Wait with timeout
+        $completed = Wait-Job -Job $job -Timeout ($TimeoutMinutes * 60)
+
+        if ($completed) {
+            $textOutput = Receive-Job -Job $job
+            if ($textOutput) {
+                $textOutput | ForEach-Object { Write-Host $_ }
+                $textOutput | Add-Content -Path $LogFile
+            }
+        }
+        Remove-Job -Job $job -Force -ErrorAction SilentlyContinue
+
+        # Read full output for promise word detection
+        $output = Get-Content -Path $outputFile -Raw -ErrorAction SilentlyContinue
+
+        if ($output -match [regex]::Escape($PROMISE_REVIEW_COMPLETE)) {
+            Write-Log "${GREEN}Batch review complete${NC}"
+        }
+        elseif ($output -match [regex]::Escape($PROMISE_REVIEW_BLOCKED)) {
+            Write-Log "${YELLOW}Batch review blocked - continuing anyway${NC}"
+        }
+        else {
+            Write-Log "${YELLOW}Review output unexpected (no promise word) - continuing${NC}"
+        }
+    }
+    catch {
+        Write-Log "${YELLOW}Review error: $_ - continuing anyway${NC}"
+    }
+    finally {
+        Remove-Item -Path $outputFile -Force -ErrorAction SilentlyContinue
+    }
+}
+
+function Reset-BatchTracking {
+    try {
+        $script:BatchStartCommit = (git rev-parse HEAD 2>$null)
+    }
+    catch {
+        $script:BatchStartCommit = ""
+    }
+    $script:TasksSinceReview = 0
+    Write-Log "Batch tracking reset. Start commit: $($script:BatchStartCommit)"
+}
+
 function Start-Ralph {
     Write-Log "${BLUE}==========================================${NC}"
     Write-Log "${BLUE}Ralph Wiggum - Autonomous Dev Loop${NC}"
@@ -231,10 +329,14 @@ function Start-Ralph {
     Write-Log "Max iterations: $MaxIterations"
     Write-Log "Timeout per iteration: ${TimeoutMinutes}m"
     Write-Log "Max retries per iteration: $MaxRetries"
+    Write-Log "Review interval: every $ReviewInterval tasks"
     Write-Log "Log file: $LogFile"
     Write-Log ""
 
     Test-Dependencies
+
+    # Initialize batch tracking
+    Reset-BatchTracking
 
     $completed = 0
     $iteration = 1
@@ -275,14 +377,29 @@ function Start-Ralph {
             0 {
                 # Success - task completed, continue to next
                 $completed++
+                $script:TasksSinceReview++
                 $iteration++
                 Write-Log ""
-                Write-Log "Completed $completed task(s) so far. Continuing..."
+                Write-Log "Completed $completed task(s) so far ($($script:TasksSinceReview) since last review). Continuing..."
                 Write-Log ""
+
+                # Run batch review every ReviewInterval tasks
+                if ($script:TasksSinceReview -ge $ReviewInterval) {
+                    Write-Log ""
+                    Invoke-RalphReview -TasksCount $script:TasksSinceReview
+                    Reset-BatchTracking
+                    Write-Log ""
+                }
+
                 Start-Sleep -Seconds 2
             }
             1 {
-                # No more issues - clean exit
+                # No more issues - run final review if any tasks since last review
+                if ($script:TasksSinceReview -gt 0) {
+                    Write-Log ""
+                    Write-Log "Running final batch review..."
+                    Invoke-RalphReview -TasksCount $script:TasksSinceReview
+                }
                 Write-Log ""
                 Write-Log "${GREEN}==========================================${NC}"
                 Write-Log "${GREEN}Ralph finished - no more issues${NC}"
@@ -321,6 +438,13 @@ function Start-Ralph {
         Write-Log "${YELLOW}Completed: $completed task(s)${NC}"
         Write-Log "${YELLOW}==========================================${NC}"
         exit 130
+    }
+
+    # Run final review if any tasks since last review
+    if ($script:TasksSinceReview -gt 0) {
+        Write-Log ""
+        Write-Log "Running final batch review..."
+        Invoke-RalphReview -TasksCount $script:TasksSinceReview
     }
 
     Write-Log ""

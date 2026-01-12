@@ -68,6 +68,7 @@ See [Autonomous Workflow](#autonomous-workflow-ralph) for details.
 | `/brainstorm` | Interview → spec → design system (UI apps) → issues |
 | `/next-feature` | Interactive: Pick issue → explore → architect → implement → review → done |
 | `/ralph-task` | Autonomous: Pick issue → implement → test → PR → review → merge |
+| `/ralph-review` | Batch audit: Verify acceptance criteria, spec alignment, create corrective issues |
 | `/review-loop` | Code review loop until clean |
 | `/write-human` | Human-sounding prose (British English) |
 
@@ -156,18 +157,27 @@ Each `/ralph-task` iteration:
 8. Auto-merges on success
 9. Outputs promise word for loop control
 
+**Batch Review** (every 5 tasks by default):
+- Verifies acceptance criteria are actually met
+- Checks alignment with SPEC.md (if exists)
+- Validates convention adherence (CLAUDE.md, AGENTS.md)
+- Creates high-priority corrective issues for any drift
+
 ### Running Ralph
 
 **Unix/Mac:**
 ```bash
 # Make scripts executable (first time only)
-chmod +x scripts/ralph.sh scripts/quality-checks.sh
+chmod +x scripts/ralph.sh
 
 # Run with max 10 iterations
 ./scripts/ralph.sh 10
 
 # With notifications (set NOTIFY_CMD)
 NOTIFY_CMD="terminal-notifier -message" ./scripts/ralph.sh 10
+
+# Custom review interval (default: 5)
+REVIEW_INTERVAL=3 ./scripts/ralph.sh 10
 ```
 
 **Windows:**
@@ -180,6 +190,9 @@ NOTIFY_CMD="terminal-notifier -message" ./scripts/ralph.sh 10
 
 # Custom log file
 .\scripts\ralph.ps1 -MaxIterations 20 -LogFile "C:\logs\ralph.log"
+
+# Custom review interval (default: 5)
+.\scripts\ralph.ps1 -MaxIterations 10 -ReviewInterval 3
 ```
 
 ### Creating Autonomous-Ready Issues

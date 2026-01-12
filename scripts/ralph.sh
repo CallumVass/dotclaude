@@ -15,6 +15,7 @@
 #   LOG_FILE - Path to log file (default: ~/.claude/ralph.log)
 #   TIMEOUT_MINUTES - Timeout per iteration in minutes (default: 45)
 #   MAX_RETRIES - Retries per iteration for crashes/malformed requests (default: 3)
+#   REVIEW_INTERVAL - Run batch review every N completed tasks (default: 5)
 #
 # Signals:
 #   Ctrl+C - Graceful stop after current operation (second Ctrl+C force-quits)
@@ -28,14 +29,23 @@ NOTIFY_CMD="${NOTIFY_CMD:-}"
 LOG_FILE="${LOG_FILE:-$HOME/.claude/ralph.log}"
 TIMEOUT_MINUTES="${TIMEOUT_MINUTES:-45}"  # Timeout per iteration
 MAX_RETRIES="${MAX_RETRIES:-3}"  # Retries per iteration for crashes/malformed requests
+REVIEW_INTERVAL="${REVIEW_INTERVAL:-5}"  # Run batch review every N tasks
 
 # Track if we're being interrupted
 INTERRUPTED=false
 
-# Promise words
+# Promise words - ralph-task
 PROMISE_COMPLETE="<promise>COMPLETE</promise>"
 PROMISE_NO_ISSUES="<promise>NO_ISSUES</promise>"
 PROMISE_BLOCKED="<promise>BLOCKED</promise>"
+
+# Promise words - ralph-review
+PROMISE_REVIEW_COMPLETE="<promise>REVIEW_COMPLETE</promise>"
+PROMISE_REVIEW_BLOCKED="<promise>REVIEW_BLOCKED</promise>"
+
+# Batch tracking
+BATCH_START_COMMIT=""
+TASKS_SINCE_REVIEW=0
 
 # Colours
 RED='\033[0;31m'
@@ -149,6 +159,52 @@ run_ralph_iteration() {
     fi
 }
 
+run_ralph_review() {
+    local tasks_count=$1
+    local output_file
+    output_file=$(mktemp)
+
+    log "${BLUE}========================================${NC}"
+    log "${BLUE}Running Batch Review${NC}"
+    log "${BLUE}========================================${NC}"
+    log "Reviewing last $tasks_count task(s) since commit $BATCH_START_COMMIT"
+    log ""
+
+    local exit_code=0
+    timeout "${TIMEOUT_MINUTES}m" claude \
+        --dangerously-skip-permissions \
+        --output-format stream-json \
+        --verbose \
+        -p "/ralph-review --start_commit=$BATCH_START_COMMIT --tasks_count=$tasks_count" 2>&1 | tee "$output_file" | \
+        jq -r 'select(.type == "assistant") | .message.content[]? | select(.type? == "text") | .text' 2>/dev/null || exit_code=$?
+
+    # Append to log
+    jq -r 'select(.type == "assistant") | .message.content[]? | select(.type? == "text") | .text' "$output_file" 2>/dev/null >> "$LOG_FILE"
+
+    local output
+    output=$(cat "$output_file")
+
+    if [[ "$output" == *"$PROMISE_REVIEW_COMPLETE"* ]]; then
+        log "${GREEN}Batch review complete${NC}"
+        rm -f "$output_file"
+        return 0
+    elif [[ "$output" == *"$PROMISE_REVIEW_BLOCKED"* ]]; then
+        log "${YELLOW}Batch review blocked - continuing anyway${NC}"
+        rm -f "$output_file"
+        return 0  # Don't stop the loop for review issues
+    else
+        log "${YELLOW}Review output unexpected (no promise word) - continuing${NC}"
+        rm -f "$output_file"
+        return 0  # Don't stop the loop for review issues
+    fi
+}
+
+reset_batch_tracking() {
+    BATCH_START_COMMIT=$(git rev-parse HEAD 2>/dev/null || echo "")
+    TASKS_SINCE_REVIEW=0
+    log "Batch tracking reset. Start commit: $BATCH_START_COMMIT"
+}
+
 main() {
     log "${BLUE}==========================================${NC}"
     log "${BLUE}Ralph Wiggum - Autonomous Dev Loop${NC}"
@@ -156,10 +212,14 @@ main() {
     log "Max iterations: $MAX_ITERATIONS"
     log "Timeout per iteration: ${TIMEOUT_MINUTES}m"
     log "Max retries per iteration: $MAX_RETRIES"
+    log "Review interval: every $REVIEW_INTERVAL tasks"
     log "Log file: $LOG_FILE"
     log ""
 
     check_dependencies
+
+    # Initialize batch tracking
+    reset_batch_tracking
 
     local completed=0
     local iteration=1
@@ -200,14 +260,29 @@ main() {
         if [[ $result -eq 0 ]]; then
             # Success - task completed, continue to next
             ((++completed))
+            ((++TASKS_SINCE_REVIEW))
             ((++iteration))
             log ""
-            log "Completed $completed task(s) so far. Continuing..."
+            log "Completed $completed task(s) so far ($TASKS_SINCE_REVIEW since last review). Continuing..."
             log ""
+
+            # Run batch review every REVIEW_INTERVAL tasks
+            if [[ $TASKS_SINCE_REVIEW -ge $REVIEW_INTERVAL ]]; then
+                log ""
+                run_ralph_review $TASKS_SINCE_REVIEW
+                reset_batch_tracking
+                log ""
+            fi
+
             # Brief pause between iterations
             sleep 2
         elif [[ $result -eq 1 ]]; then
-            # No more issues - clean exit
+            # No more issues - run final review if any tasks since last review
+            if [[ $TASKS_SINCE_REVIEW -gt 0 ]]; then
+                log ""
+                log "Running final batch review..."
+                run_ralph_review $TASKS_SINCE_REVIEW
+            fi
             log ""
             log "${GREEN}==========================================${NC}"
             log "${GREEN}Ralph finished - no more issues${NC}"
@@ -243,6 +318,13 @@ main() {
         log "${YELLOW}Completed: $completed task(s)${NC}"
         log "${YELLOW}==========================================${NC}"
         exit 130
+    fi
+
+    # Run final review if any tasks since last review
+    if [[ $TASKS_SINCE_REVIEW -gt 0 ]]; then
+        log ""
+        log "Running final batch review..."
+        run_ralph_review $TASKS_SINCE_REVIEW
     fi
 
     log ""
