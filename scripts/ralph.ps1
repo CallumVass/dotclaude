@@ -458,7 +458,7 @@ function Start-Ralph {
 # Track if cleanup has run
 $script:CleanupDone = $false
 
-# Cleanup function to kill child processes
+# Cleanup function to kill all spawned processes
 function Stop-ChildProcesses {
     param([switch]$IsInterrupt)
 
@@ -470,7 +470,7 @@ function Stop-ChildProcesses {
 
     if ($IsInterrupt) {
         $script:Interrupted = $true
-        Write-Log "${YELLOW}Interrupt received - killing child processes...${NC}"
+        Write-Log "${YELLOW}Interrupt received - killing all spawned processes...${NC}"
     }
 
     # Stop the current job if running
@@ -485,17 +485,10 @@ function Stop-ChildProcesses {
         $script:CurrentJob = $null
     }
 
-    # Kill any orphaned claude processes started by this script
-    # Get child processes of the current PowerShell process
-    $currentPid = $PID
-    Get-CimInstance Win32_Process -Filter "ParentProcessId = $currentPid" -ErrorAction SilentlyContinue |
+    # Kill all child process trees using native Windows taskkill /T (tree kill)
+    Get-CimInstance Win32_Process -Filter "ParentProcessId = $PID" -ErrorAction SilentlyContinue |
         ForEach-Object {
-            try {
-                Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
-            }
-            catch {
-                # Ignore errors
-            }
+            $null = taskkill /T /F /PID $_.ProcessId 2>&1
         }
 }
 

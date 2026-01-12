@@ -23,6 +23,9 @@
 
 set -uo pipefail
 
+# Enable job control so we become a process group leader
+set -m
+
 # Configuration
 MAX_ITERATIONS="${1:-10}"
 NOTIFY_CMD="${NOTIFY_CMD:-}"
@@ -335,13 +338,14 @@ main() {
     notify "Ralph: Max iterations reached ($completed tasks done)"
 }
 
-# Handle interrupts gracefully - kill children and set flag
+# Handle interrupts gracefully - kill entire process group
 cleanup() {
     INTERRUPTED=true
-    log "${YELLOW}Interrupt received - killing child processes...${NC}"
-    # Kill all child processes of this script
-    pkill -P $$ 2>/dev/null || true
-    trap - INT TERM  # Reset trap to allow force-quit on second Ctrl+C
+    log "${YELLOW}Interrupt received - killing all spawned processes...${NC}"
+    # Kill entire process group (negative PID = process group)
+    # This kills all children, grandchildren, etc. spawned by this script
+    trap - INT TERM  # Reset trap first to allow force-quit on second Ctrl+C
+    kill -- -$$ 2>/dev/null || true
 }
 
 trap cleanup INT TERM
