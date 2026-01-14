@@ -1,10 +1,6 @@
 ---
 name: setup-rules
-description: Detect project tech stack and consolidate relevant rules into CLAUDE.md. Use when user says "setup rules", "init rules", "personalise".
-arguments:
-  - name: stack
-    description: Override auto-detection (e.g., "dotnet,typescript")
-    required: false
+description: Detect project tech stack and consolidate relevant rules into CLAUDE.md. Use when user says "setup rules", "init rules", "personalise", "configure rules", "add rules".
 ---
 
 # Setup Rules

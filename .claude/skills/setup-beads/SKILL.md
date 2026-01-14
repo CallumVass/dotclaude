@@ -1,10 +1,6 @@
 ---
 name: setup-beads
-description: Initialize beads issue tracker with protected branch workflow. Use when user says "setup beads", "init beads", "add beads".
-arguments:
-  - name: branch
-    description: Sync branch name (defaults to beads-sync)
-    required: false
+description: Initialize beads issue tracker with protected branch workflow. Use when user says "setup beads", "init beads", "add beads", "configure beads", "install beads".
 ---
 
 # Setup Beads

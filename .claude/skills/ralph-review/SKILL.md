@@ -1,13 +1,6 @@
 ---
 name: ralph-review
-description: Batch audit of autonomous Ralph work. Verifies acceptance criteria, spec alignment, and convention adherence. Creates corrective issues for drift.
-arguments:
-  - name: start_commit
-    description: Git commit hash from start of batch (defaults to HEAD~5)
-    required: false
-  - name: tasks_count
-    description: Number of recently completed tasks to review (default 5)
-    required: false
+description: Batch audit of autonomous Ralph work. Verifies acceptance criteria, spec alignment, and convention adherence. Creates corrective issues for drift. Use after running ralph-task multiple times or when user says "review ralph's work", "audit batch", "check autonomous work".
 ---
 
 # Ralph Review (Batch Audit)
@@ -23,16 +16,13 @@ Output EXACTLY ONE at the END of your response:
 | `<promise>REVIEW_COMPLETE</promise>` | Review finished. Any issues created as high-priority beads tickets. |
 | `<promise>REVIEW_BLOCKED</promise>` | Review itself failed (can't access data, beads error, etc.). |
 
-## Critical Rule
-
-**YOU MUST OUTPUT EXACTLY ONE PROMISE WORD BEFORE ENDING YOUR RESPONSE.**
+**CRITICAL: Every execution path must end with exactly one promise word.**
 
 ## Constraints
 
-- **No user interaction** - fully autonomous
-- **No AskUserQuestion** - make all decisions
+- **No user interaction** - fully autonomous, no AskUserQuestion
 - **Create issues, don't fix** - this is an audit, not a fix-it session
-- **High priority only** - created issues get priority 1 (worked on next)
+- **High priority only** - created issues get priority 1
 - **Be specific** - issues must have clear acceptance criteria
 
 ---
@@ -42,44 +32,24 @@ Output EXACTLY ONE at the END of your response:
 ### 1. Gather Context
 
 ```bash
-# Get start commit (use argument or default to HEAD~5)
 START_COMMIT="${start_commit:-$(git rev-parse HEAD~5)}"
-
-# Get current HEAD
 git rev-parse HEAD
 ```
 
-Read project context files (if they exist):
-- `SPEC.md` - Product specification
-- `CLAUDE.md` - Project conventions and mandatory constraints
-- `AGENTS.md` - Agent-specific guidance
+Read project context files (if they exist): `SPEC.md`, `CLAUDE.md`, `AGENTS.md`
 
 ### 2. Get Completed Issues
 
 ```bash
-# Get recently completed issues (newest first)
 bd list --status=done --json | jq -r '.[:5]'
 ```
 
-Parse the JSON. Extract for each issue:
-- Issue ID
-- Title
-- Acceptance criteria
-- Implementation hints (if any)
-
-If no completed issues found:
-```
-No completed issues to review.
-<promise>REVIEW_COMPLETE</promise>
-```
+If no completed issues: output `<promise>REVIEW_COMPLETE</promise>` and stop.
 
 ### 3. Get Git Changes
 
 ```bash
-# Files changed in batch
 git diff --name-only $START_COMMIT HEAD
-
-# Full diff for analysis
 git diff $START_COMMIT HEAD --stat
 ```
 
@@ -87,53 +57,22 @@ git diff $START_COMMIT HEAD --stat
 
 For each completed issue, verify:
 
-#### 4.1 Acceptance Criteria Check
+**4.1 Acceptance Criteria Check**
+- Locate the implementation
+- Verify it works as specified
+- Check tests exist and cover the criterion
+- Mark as: VERIFIED | PARTIAL | MISSING | BROKEN
 
-```
-For each AC item in the issue:
-  - Locate the implementation (search codebase)
-  - Verify it actually works as specified
-  - Check tests exist and cover the criterion
-  - Mark as: VERIFIED | PARTIAL | MISSING | BROKEN
-```
+**4.2 SPEC.md Alignment** (if exists)
+- Find relevant section(s)
+- Verify implementation matches spec intent
+- Check for deviations
 
-**Findings to flag:**
-- AC marked complete but implementation missing
-- AC marked complete but tests missing
-- AC implemented but behaviour incorrect
-- AC partially implemented (missing edge cases)
-
-#### 4.2 SPEC.md Alignment (if exists)
-
-```
-If SPEC.md exists:
-  - Find section(s) relevant to completed issues
-  - Verify implementation matches spec intent
-  - Check for deviations or misinterpretations
-```
-
-**Findings to flag:**
-- Implementation contradicts spec
-- Implementation misses spec requirements
-- Implementation adds unspecified behaviour
-
-#### 4.3 Convention Check (CLAUDE.md / AGENTS.md)
-
-```
-For each mandatory constraint:
-  - Check if any changed files violate it
-  - Check if any new patterns introduced break conventions
-```
-
-**Findings to flag:**
-- Raw Tailwind values instead of semantic tokens
-- Missing tests for boundary code
-- Wrong framework/library used
-- Code style violations
+**4.3 Convention Check** (CLAUDE.md / AGENTS.md)
+- Check if changed files violate mandatory constraints
+- Check if new patterns break conventions
 
 ### 5. Compile Findings
-
-Group findings by severity:
 
 | Severity | Description | Action |
 |----------|-------------|--------|
@@ -143,25 +82,18 @@ Group findings by severity:
 
 ### 6. Create Corrective Issues
 
-For each finding at CRITICAL or HIGH severity, create a beads issue:
+For CRITICAL or HIGH findings:
 
 ```bash
 bd add --priority=1 --json << 'EOF'
 {
   "title": "[Ralph Review] Fix: <brief description>",
-  "body": "## Origin\nIdentified during batch review of tasks: <issue-ids>\n\n## Problem\n<what was found>\n\n## Acceptance Criteria\n- [ ] <specific fix criterion 1>\n- [ ] <specific fix criterion 2>\n\n## Context\n- Original issue: <issue-id>\n- Files affected: <file list>\n- Spec reference: <if applicable>"
+  "body": "## Origin\nIdentified during batch review of tasks: <issue-ids>\n\n## Problem\n<what was found>\n\n## Acceptance Criteria\n- [ ] <specific fix criterion 1>\n- [ ] <specific fix criterion 2>\n\n## Context\n- Original issue: <issue-id>\n- Files affected: <file list>"
 }
 EOF
 ```
 
-**Issue title patterns:**
-- `[Ralph Review] Fix: <AC item> not implemented in <issue>`
-- `[Ralph Review] Fix: <file> violates <constraint>`
-- `[Ralph Review] Fix: <feature> deviates from SPEC.md`
-
 ### 7. Summary Report
-
-Output a summary:
 
 ```
 ## Ralph Review Summary
@@ -174,12 +106,7 @@ Output a summary:
 
 | Issue | Finding | Severity | Corrective Issue |
 |-------|---------|----------|------------------|
-| bd-xxx | AC item missing tests | HIGH | bd-yyy |
-| bd-xxx | Uses bg-gray-100 not bg-surface | HIGH | bd-yyy |
-
-### Created Issues
-- bd-yyy: [Ralph Review] Fix: Add tests for user avatar upload
-- bd-zzz: [Ralph Review] Fix: Replace raw Tailwind with semantic tokens
+| bd-xxx | Description | HIGH | bd-yyy |
 
 ### Stats
 - Verified: X items
@@ -196,7 +123,6 @@ If no issues found:
 
 **Batch:** $START_COMMIT → HEAD
 **Issues reviewed:** <count>
-**Files changed:** <count>
 
 All acceptance criteria verified. No spec deviations. Conventions followed.
 
@@ -209,75 +135,10 @@ All acceptance criteria verified. No spec deviations. Conventions followed.
 
 | Situation | Action |
 |-----------|--------|
-| Can't access git history | Output `<promise>REVIEW_BLOCKED</promise>` |
-| Beads not available | Output `<promise>REVIEW_BLOCKED</promise>` |
-| No completed issues | Output `<promise>REVIEW_COMPLETE</promise>` (nothing to review) |
-| Issues found | Create tickets, output `<promise>REVIEW_COMPLETE</promise>` |
-| No issues found | Output `<promise>REVIEW_COMPLETE</promise>` |
+| Can't access git history | `<promise>REVIEW_BLOCKED</promise>` |
+| Beads not available | `<promise>REVIEW_BLOCKED</promise>` |
+| No completed issues | `<promise>REVIEW_COMPLETE</promise>` |
+| Issues found | Create tickets, `<promise>REVIEW_COMPLETE</promise>` |
+| Unexpected error | `<promise>REVIEW_BLOCKED</promise>` with explanation |
 
----
-
-## Example Output (Issues Found)
-
-```
-## Ralph Review Summary
-
-**Batch:** a1b2c3d → e4f5g6h
-**Issues reviewed:** 3
-**Files changed:** 12
-
-### Findings
-
-| Issue | Finding | Severity | Corrective Issue |
-|-------|---------|----------|------------------|
-| bd-a1b | Avatar upload missing size validation | CRITICAL | bd-x1y |
-| bd-a1b | ImageUpload.vue uses bg-white not bg-surface | HIGH | bd-x2z |
-| bd-c3d | Dashboard stats endpoint missing tests | HIGH | bd-x3w |
-
-### Created Issues
-- bd-x1y: [Ralph Review] Fix: Add 2MB size validation to avatar upload
-- bd-x2z: [Ralph Review] Fix: Replace bg-white with bg-surface in ImageUpload.vue
-- bd-x3w: [Ralph Review] Fix: Add boundary tests for /api/dashboard/stats
-
-### Stats
-- Verified: 8 items
-- Partial: 2 items
-- Issues created: 3
-
-<promise>REVIEW_COMPLETE</promise>
-```
-
-## Example Output (Clean)
-
-```
-## Ralph Review Summary
-
-**Batch:** a1b2c3d → e4f5g6h
-**Issues reviewed:** 5
-**Files changed:** 23
-
-All acceptance criteria verified. No spec deviations. Conventions followed.
-
-### Stats
-- Verified: 15 items
-- Partial: 0 items
-- Issues created: 0
-
-<promise>REVIEW_COMPLETE</promise>
-```
-
----
-
-## Catch-All Safety Net
-
-If you reach an unexpected state:
-
-```
-## Unexpected State
-
-<explain what happened>
-
-<promise>REVIEW_BLOCKED</promise>
-```
-
-**NEVER end your response without a promise word.**
+**NEVER end without a promise word.**

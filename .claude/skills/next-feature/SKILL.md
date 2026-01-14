@@ -1,10 +1,6 @@
 ---
 name: next-feature
-description: Pick next beads issue, explore codebase, design architecture, implement, review. Use when user says "next feature", "next task", "pick an issue", "what's next".
-arguments:
-  - name: issue
-    description: Specific issue ID (defaults to next from bd ready)
-    required: false
+description: Pick next beads issue, explore codebase, design architecture, implement, review. Use when user says "next feature", "next task", "pick an issue", "what's next", "start working", "implement issue", "work on bd-xxx", "let's build".
 ---
 
 # Next Feature

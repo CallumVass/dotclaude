@@ -1,10 +1,6 @@
 ---
 name: review-loop
-description: Iterative code review until clean. Use after making changes, before committing, or when user says "review", "check my code".
-arguments:
-  - name: files
-    description: Specific files to review (defaults to git diff detection)
-    required: false
+description: Iterative code review until clean. Use after making changes, before committing, or when user says "review", "check my code", "lint my code", "review my changes", "check for issues", "code review".
 ---
 
 # Review Loop
