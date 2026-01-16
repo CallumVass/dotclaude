@@ -1,6 +1,6 @@
 ---
 name: ralph-task
-description: Autonomous single-iteration task execution. Picks a beads issue, implements with tests, reviews, and auto-merges. Use with external loop script. Outputs promise word on completion. Use when user says "ralph", "autonomous task", "run ralph", "auto-implement".
+description: Autonomous single-iteration beads task execution. Picks a beads issue, implements with tests, reviews, and auto-merges. Use with external loop script. Outputs promise word on completion. Use when user says "ralph", "autonomous task", "run ralph", "auto-implement".
 ---
 
 # Ralph Task (Autonomous Single Iteration)
@@ -22,7 +22,7 @@ Output EXACTLY ONE at the END of your response:
 ## Constraints
 
 - **No user interaction** - fully autonomous, no AskUserQuestion
-- **No skill invocation** - do NOT run /next-feature, /review-loop, etc.
+- **No skill invocation** - do NOT run /review-loop or other skills
 - **ONLY spawn feature-dev:code-reviewer** - for code review in step 8
 - **Max 3 code review cycles** - then output BLOCKED
 - **Boundary tests mandatory** - task not complete without them
