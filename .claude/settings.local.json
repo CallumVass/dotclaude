@@ -16,7 +16,9 @@
       "WebFetch(domain:github.com)",
       "WebFetch(domain:raw.githubusercontent.com)",
       "Bash(findstr:*)",
-      "Skill(skill-creator)"
+      "Skill(skill-creator)",
+      "Skill(setup)",
+      "Skill(brainstorm)"
     ]
   }
 }

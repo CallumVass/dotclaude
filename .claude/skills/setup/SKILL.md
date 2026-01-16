@@ -74,7 +74,17 @@ bd doctor
 
 Resolve any issues reported by `bd doctor`.
 
-### 5. Add Beads Workflow to CLAUDE.md
+### 5. Copy Ralph Scripts
+
+Copy the ralph automation scripts to the project:
+
+```bash
+cp -r ~/.claude/scripts ./scripts
+```
+
+This provides `scripts/ralph.sh` and `scripts/ralph.ps1` for autonomous workflow.
+
+### 6. Add Beads Workflow to CLAUDE.md
 
 If beads was set up, append this to CLAUDE.md:
 
@@ -105,10 +115,11 @@ Use `bd` for task tracking. Key rules:
 - `bd sync` - sync and push
 ```
 
-### 6. Report
+### 7. Report
 
 Summarise what was configured:
 - Stack rules copied
+- Ralph scripts copied
 - Beads setup status
 - Any manual steps needed
 

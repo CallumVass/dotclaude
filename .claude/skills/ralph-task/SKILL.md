@@ -22,7 +22,7 @@ Output EXACTLY ONE at the END of your response:
 ## Constraints
 
 - **No user interaction** - fully autonomous, no AskUserQuestion
-- **No skill invocation** - do NOT run /review-loop or other skills
+- **No skill invocation by default** - do NOT run skills unless explicitly specified in the issue's Agent Instructions section
 - **ONLY spawn feature-dev:code-reviewer** - for code review in step 8
 - **Max 3 code review cycles** - then output BLOCKED
 - **Boundary tests mandatory** - task not complete without them

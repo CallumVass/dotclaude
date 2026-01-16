@@ -58,9 +58,9 @@ $PROMISE_BLOCKED = "<promise>BLOCKED</promise>"
 $PROMISE_REVIEW_COMPLETE = "<promise>REVIEW_COMPLETE</promise>"
 $PROMISE_REVIEW_BLOCKED = "<promise>REVIEW_BLOCKED</promise>"
 
-# Track interruption and current job
+# Track interruption and current process
 $script:Interrupted = $false
-$script:CurrentJob = $null
+$script:CurrentProcess = $null
 
 # Batch tracking
 $script:BatchStartCommit = ""
@@ -108,6 +108,13 @@ function Send-Notification {
     }
 }
 
+function Stop-ProcessTree {
+    param([int]$ProcessId)
+
+    # Kill entire process tree using taskkill /T
+    $null = taskkill /T /F /PID $ProcessId 2>&1
+}
+
 function Test-Dependencies {
     $missing = @()
 
@@ -141,62 +148,72 @@ function Invoke-RalphIteration {
     Write-Log ""
 
     try {
-        # Create a job to run claude with timeout
-        $script:CurrentJob = Start-Job -ScriptBlock {
-            param($outputPath)
+        # Use .NET Process for true streaming (like bash tee | jq)
+        $psi = New-Object System.Diagnostics.ProcessStartInfo
+        $psi.FileName = "claude"
+        $psi.Arguments = "--dangerously-skip-permissions --output-format stream-json --verbose -p '/ralph-task'"
+        $psi.UseShellExecute = $false
+        $psi.RedirectStandardOutput = $true
+        $psi.RedirectStandardError = $true
+        $psi.CreateNoWindow = $true
 
-            $output = & claude `
-                --dangerously-skip-permissions `
-                --output-format stream-json `
-                --verbose `
-                -p '/ralph-task' 2>&1
+        $process = New-Object System.Diagnostics.Process
+        $process.StartInfo = $psi
+        $script:CurrentProcess = $process
 
-            $output | Out-File -FilePath $outputPath -Encoding utf8
+        $outputBuilder = [System.Text.StringBuilder]::new()
+        $timeoutMs = $TimeoutMinutes * 60 * 1000
+        $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
 
-            # Stream text output
-            $output | ForEach-Object {
-                try {
-                    $json = $_ | ConvertFrom-Json -ErrorAction SilentlyContinue
-                    if ($json.type -eq "assistant" -and $json.message.content) {
-                        foreach ($content in $json.message.content) {
-                            if ($content.type -eq "text") {
-                                Write-Output $content.text
-                            }
+        $null = $process.Start()
+
+        # Read stdout line-by-line for true streaming
+        while (-not $process.StandardOutput.EndOfStream) {
+            # Check timeout
+            if ($stopwatch.ElapsedMilliseconds -gt $timeoutMs) {
+                Stop-ProcessTree $process.Id
+                $script:CurrentProcess = $null
+                Write-Log "${YELLOW}Iteration timed out after $TimeoutMinutes minutes${NC}"
+                Remove-Item -Path $outputFile -Force -ErrorAction SilentlyContinue
+                return 3  # Retry-able
+            }
+
+            # Check for interrupt
+            if ($script:Interrupted) {
+                Stop-ProcessTree $process.Id
+                $script:CurrentProcess = $null
+                return 3
+            }
+
+            $line = $process.StandardOutput.ReadLine()
+            if ($null -eq $line) { continue }
+
+            # Save raw output for promise word detection
+            $null = $outputBuilder.AppendLine($line)
+
+            # Parse JSON and stream text content (like jq in bash)
+            try {
+                $json = $line | ConvertFrom-Json -ErrorAction SilentlyContinue
+                if ($json.type -eq "assistant" -and $json.message.content) {
+                    foreach ($content in $json.message.content) {
+                        if ($content.type -eq "text") {
+                            Write-Host $content.text
+                            Add-Content -Path $LogFile -Value $content.text
                         }
                     }
                 }
-                catch {
-                    # Not valid JSON, skip
-                }
             }
-        } -ArgumentList $outputFile
-        $job = $script:CurrentJob
-
-        # Wait with timeout
-        $completed = Wait-Job -Job $job -Timeout ($TimeoutMinutes * 60)
-
-        if (-not $completed) {
-            # Timeout occurred
-            Stop-Job -Job $job
-            Remove-Job -Job $job -Force
-            $script:CurrentJob = $null
-            Write-Log "${YELLOW}Iteration timed out after $TimeoutMinutes minutes${NC}"
-            Remove-Item -Path $outputFile -Force -ErrorAction SilentlyContinue
-            return 3  # Retry-able
+            catch {
+                # Not valid JSON, skip
+            }
         }
 
-        # Get job output and display
-        $textOutput = Receive-Job -Job $job
-        if ($textOutput) {
-            $textOutput | ForEach-Object { Write-Host $_ }
-            # Append to log file
-            $textOutput | Add-Content -Path $LogFile
-        }
-        Remove-Job -Job $job -Force
-        $script:CurrentJob = $null
+        $process.WaitForExit()
+        $script:CurrentProcess = $null
 
-        # Read full output for promise word detection
-        $output = Get-Content -Path $outputFile -Raw -ErrorAction SilentlyContinue
+        # Save full output for promise word detection
+        $output = $outputBuilder.ToString()
+        $output | Out-File -FilePath $outputFile -Encoding utf8
 
         # Check for promise words
         if ($output -match [regex]::Escape($PROMISE_COMPLETE)) {
@@ -249,49 +266,59 @@ function Invoke-RalphReview {
     Write-Log ""
 
     try {
-        $job = Start-Job -ScriptBlock {
-            param($outputPath, $startCommit, $count)
+        # Use .NET Process for true streaming
+        $psi = New-Object System.Diagnostics.ProcessStartInfo
+        $psi.FileName = "claude"
+        $psi.Arguments = "--dangerously-skip-permissions --output-format stream-json --verbose -p '/ralph-review --start_commit=$($script:BatchStartCommit) --tasks_count=$TasksCount'"
+        $psi.UseShellExecute = $false
+        $psi.RedirectStandardOutput = $true
+        $psi.RedirectStandardError = $true
+        $psi.CreateNoWindow = $true
 
-            $output = & claude `
-                --dangerously-skip-permissions `
-                --output-format stream-json `
-                --verbose `
-                -p "/ralph-review --start_commit=$startCommit --tasks_count=$count" 2>&1
+        $process = New-Object System.Diagnostics.Process
+        $process.StartInfo = $psi
 
-            $output | Out-File -FilePath $outputPath -Encoding utf8
+        $outputBuilder = [System.Text.StringBuilder]::new()
+        $timeoutMs = $TimeoutMinutes * 60 * 1000
+        $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
 
-            # Stream text output
-            $output | ForEach-Object {
-                try {
-                    $json = $_ | ConvertFrom-Json -ErrorAction SilentlyContinue
-                    if ($json.type -eq "assistant" -and $json.message.content) {
-                        foreach ($content in $json.message.content) {
-                            if ($content.type -eq "text") {
-                                Write-Output $content.text
-                            }
+        $null = $process.Start()
+
+        # Read stdout line-by-line for true streaming
+        while (-not $process.StandardOutput.EndOfStream) {
+            # Check timeout
+            if ($stopwatch.ElapsedMilliseconds -gt $timeoutMs) {
+                Stop-ProcessTree $process.Id
+                break
+            }
+
+            $line = $process.StandardOutput.ReadLine()
+            if ($null -eq $line) { continue }
+
+            # Save raw output for promise word detection
+            $null = $outputBuilder.AppendLine($line)
+
+            # Parse JSON and stream text content
+            try {
+                $json = $line | ConvertFrom-Json -ErrorAction SilentlyContinue
+                if ($json.type -eq "assistant" -and $json.message.content) {
+                    foreach ($content in $json.message.content) {
+                        if ($content.type -eq "text") {
+                            Write-Host $content.text
+                            Add-Content -Path $LogFile -Value $content.text
                         }
                     }
                 }
-                catch {
-                    # Not valid JSON, skip
-                }
             }
-        } -ArgumentList $outputFile, $script:BatchStartCommit, $TasksCount
-
-        # Wait with timeout
-        $completed = Wait-Job -Job $job -Timeout ($TimeoutMinutes * 60)
-
-        if ($completed) {
-            $textOutput = Receive-Job -Job $job
-            if ($textOutput) {
-                $textOutput | ForEach-Object { Write-Host $_ }
-                $textOutput | Add-Content -Path $LogFile
+            catch {
+                # Not valid JSON, skip
             }
         }
-        Remove-Job -Job $job -Force -ErrorAction SilentlyContinue
 
-        # Read full output for promise word detection
-        $output = Get-Content -Path $outputFile -Raw -ErrorAction SilentlyContinue
+        $process.WaitForExit()
+
+        # Check for promise words
+        $output = $outputBuilder.ToString()
 
         if ($output -match [regex]::Escape($PROMISE_REVIEW_COMPLETE)) {
             Write-Log "${GREEN}Batch review complete${NC}"
@@ -473,16 +500,15 @@ function Stop-ChildProcesses {
         Write-Log "${YELLOW}Interrupt received - killing all spawned processes...${NC}"
     }
 
-    # Stop the current job if running
-    if ($script:CurrentJob) {
+    # Stop the current process if running
+    if ($script:CurrentProcess -and -not $script:CurrentProcess.HasExited) {
         try {
-            Stop-Job -Job $script:CurrentJob -ErrorAction SilentlyContinue
-            Remove-Job -Job $script:CurrentJob -Force -ErrorAction SilentlyContinue
+            Stop-ProcessTree $script:CurrentProcess.Id
         }
         catch {
             # Ignore errors during cleanup
         }
-        $script:CurrentJob = $null
+        $script:CurrentProcess = $null
     }
 
     # Kill all child process trees using native Windows taskkill /T (tree kill)

@@ -41,6 +41,9 @@ When creating issues with `bd create`, use this structure:
 ## Dependencies
 - Blocked by: [bd-xxx] (if any)
 - Blocks: [bd-yyy] (if any)
+
+## Agent Instructions (optional)
+[Skills to invoke, e.g., "Use /frontend-design skill when creating UI components"]
 ```
 
 ## Example: Good Autonomous Issue
